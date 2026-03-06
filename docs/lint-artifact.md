@@ -20,6 +20,9 @@ The artifact is a stable product contract for a lint run. It is separate from Fi
 - `firety skill plan --artifact <path>` writes a sibling improvement-plan artifact with prioritized remediation items and supporting evidence
 - `firety skill gate --artifact <path>` writes a sibling quality-gate artifact with a deterministic PASS or FAIL decision plus the selected policy criteria and blocking reasons
 - `firety skill render <artifact> --render pr-comment|ci-summary|full-report` renders those artifacts into reviewer-friendly summaries without re-running analysis
+- `firety artifact inspect <artifact>` validates a saved artifact and explains what it contains
+- `firety artifact render <artifact> --render pr-comment|ci-summary|full-report` provides an artifact-first rendering path for offline/reporting workflows
+- `firety artifact compare <base-artifact> <candidate-artifact>` compares compatible saved artifacts without rerunning analysis
 
 ## Versioning
 
@@ -238,6 +241,14 @@ Compare artifacts are intended for workflows such as:
 - future SaaS/reporting layers that should not need to re-run Firety just to render a diff
 
 Firety's render command is intentionally artifact-first: it treats these artifacts as the stable product surface for PR comments, CI summaries, and fuller local reports.
+
+Firety also has a dedicated top-level artifact workflow:
+
+- `firety artifact inspect` for validation and quick metadata inspection
+- `firety artifact render` for offline report generation from saved artifacts
+- `firety artifact compare` for modest artifact-to-artifact diff workflows where Firety has an explicit compatibility contract
+
+Those workflows are documented in [docs/artifacts.md](artifacts.md).
 
 Analysis artifacts are intended for workflows such as:
 

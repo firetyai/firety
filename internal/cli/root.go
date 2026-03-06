@@ -23,6 +23,7 @@ func NewRootCommand(application *app.App, stdout, stderr io.Writer) *cobra.Comma
 	root.SetErr(stderr)
 
 	root.AddCommand(
+		newArtifactCommand(),
 		newBenchmarkCommand(application),
 		newSkillCommand(application),
 		newMCPCommand(application),

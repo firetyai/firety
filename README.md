@@ -14,6 +14,7 @@ The goal of this foundation is to make future growth predictable without turning
 ## Current commands
 
 ```text
+firety artifact
 firety skill lint [path]
 firety skill baseline
 firety skill compatibility [path]
@@ -24,6 +25,9 @@ firety skill eval-compare <base> <candidate>
 firety skill gate [path]
 firety skill compare <base> <candidate>
 firety skill render <artifact>
+firety artifact inspect <artifact>
+firety artifact render <artifact>
+firety artifact compare <base-artifact> <candidate-artifact>
 firety skill rules
 firety benchmark run
 firety benchmark render <artifact>
@@ -125,6 +129,9 @@ firety skill render ./analysis-artifact.json --render pr-comment
 firety skill render ./compare-artifact.json --render ci-summary
 firety skill render ./gate-artifact.json --render ci-summary
 firety skill render ./plan-artifact.json --render full-report
+firety artifact inspect ./analysis-artifact.json
+firety artifact render ./analysis-artifact.json --render pr-comment
+firety artifact compare ./before-lint.json ./after-lint.json
 firety benchmark run
 firety benchmark run --format json --artifact ./benchmark-artifact.json
 firety benchmark render ./benchmark-artifact.json --render ci-summary
@@ -161,8 +168,12 @@ The rule catalog is also a first-class product surface:
 - `firety skill compatibility` summarizes support posture, portability, and backend health from Firety's existing evidence
 - `firety skill gate` turns selected Firety evidence into a deterministic PASS/FAIL policy decision
 - `firety skill render <artifact> --render pr-comment|ci-summary|full-report` turns existing artifacts into reviewer-friendly summaries without rerunning analysis
+- `firety artifact inspect <artifact>` validates a saved artifact and explains what it represents
+- `firety artifact render <artifact> --render pr-comment|ci-summary|full-report` renders a saved artifact without using the original live command path
+- `firety artifact compare <base-artifact> <candidate-artifact>` compares compatible saved artifacts without rerunning analysis
 - `firety benchmark run` turns Firety's built-in benchmark corpus into a structured maintainer/public quality summary
 - `firety benchmark render <artifact> --render pr-comment|ci-summary|full-report` renders saved benchmark artifacts without rerunning the corpus
+- artifact-first workflows are documented in [docs/artifacts.md](docs/artifacts.md)
 - dedicated rule documentation lives in [docs/lint-rules.md](docs/lint-rules.md)
 - the versioned lint artifact format is documented in [docs/lint-artifact.md](docs/lint-artifact.md)
 - routing eval behavior and the local suite/runner format are documented in [docs/skill-eval.md](docs/skill-eval.md)
@@ -196,11 +207,19 @@ Routing-risk view:
 Report rendering:
 
 - `firety skill render` is a presentation-layer command built on Firety's versioned artifacts
+- `firety artifact render` is the artifact-first companion for offline/reporting workflows where a saved artifact is the primary input
 - `--render pr-comment` is optimized for compact PR review summaries
 - `--render ci-summary` is optimized for CI job summaries and automation logs
 - `--render full-report` is the default and produces a fuller local review report
 - renderers reuse existing analysis and artifact data; they do not rerun lint or eval logic
 - the first version is artifact-driven and intentionally plain markdown/text rather than HTML or a themed report system
+
+Artifact workflows:
+
+- `firety artifact inspect` explains artifact kind, schema version, origin, summary context, and supported render/compare operations
+- `firety artifact render` produces the same reviewer-facing report styles from saved artifacts without rerunning analysis
+- `firety artifact compare` currently supports lint artifacts, single-backend eval artifacts, and multi-backend eval artifacts
+- artifact workflows fail clearly on unsupported schema versions, unsupported artifact kinds, or incompatible compare pairs
 
 Benchmark reporting:
 

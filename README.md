@@ -16,6 +16,7 @@ The goal of this foundation is to make future growth predictable without turning
 ```text
 firety skill lint [path]
 firety skill baseline
+firety skill compatibility [path]
 firety skill plan [path]
 firety skill analyze [path]
 firety skill eval [path]
@@ -51,6 +52,8 @@ firety skill lint ./path/to/skill --artifact ./lint-artifact.json
 firety skill lint ./path/to/skill --routing-risk
 firety skill baseline save ./path/to/skill --output ./baseline.json
 firety skill baseline compare ./path/to/skill --baseline ./baseline.json
+firety skill compatibility ./path/to/skill
+firety skill compatibility ./path/to/skill --backend codex=./codex-runner --backend cursor=./cursor-runner
 firety skill eval ./path/to/skill --runner ./routing-runner
 firety skill eval ./path/to/skill --format json --artifact ./eval-artifact.json
 firety skill eval ./path/to/skill --backend codex=./codex-runner --backend claude-code=./claude-runner
@@ -155,6 +158,7 @@ The rule catalog is also a first-class product surface:
 - `firety skill rules` lists the full rule catalog in text form
 - `firety skill rules --format json` exports the same catalog in a stable machine-readable form
 - `firety skill baseline` manages explicit saved baseline snapshots for long-lived regression workflows
+- `firety skill compatibility` summarizes support posture, portability, and backend health from Firety's existing evidence
 - `firety skill gate` turns selected Firety evidence into a deterministic PASS/FAIL policy decision
 - `firety skill render <artifact> --render pr-comment|ci-summary|full-report` turns existing artifacts into reviewer-friendly summaries without rerunning analysis
 - `firety benchmark run` turns Firety's built-in benchmark corpus into a structured maintainer/public quality summary
@@ -163,6 +167,7 @@ The rule catalog is also a first-class product surface:
 - the versioned lint artifact format is documented in [docs/lint-artifact.md](docs/lint-artifact.md)
 - routing eval behavior and the local suite/runner format are documented in [docs/skill-eval.md](docs/skill-eval.md)
 - baseline snapshot workflows are documented in [docs/baselines.md](docs/baselines.md)
+- compatibility workflows are documented in [docs/compatibility.md](docs/compatibility.md)
 - quality gate behavior is documented in [docs/quality-gate.md](docs/quality-gate.md)
 - benchmark reporting is documented in [docs/benchmark-reporting.md](docs/benchmark-reporting.md)
 - Firety also maintains a curated benchmark corpus and regression suite to protect lint quality over time
@@ -225,6 +230,14 @@ Baseline snapshots:
 - `firety skill baseline update [path] --baseline <file>` intentionally refreshes the saved snapshot after review
 - baseline snapshots capture the saved profile, strictness, suite, and backend context needed for later regression checks
 - baseline workflows are meant for long-lived CI and release management, not as a general history store
+
+Compatibility:
+
+- `firety skill compatibility [path]` summarizes whether Firety sees the skill as generic-portable, intentionally tool-specific, mixed-ambiguous, accidentally-tool-locked, or weak-evidence
+- the compatibility view is built from existing lint portability signals, routing-risk summaries, and optional measured backend results
+- use `--backend` to add measured backend evidence to the compatibility matrix
+- use `--input-artifact` to compute compatibility from existing Firety artifacts without rerunning analysis
+- Firety keeps support-posture claims conservative; if evidence is incomplete or conflicting, the output says so
 
 Strictness philosophy:
 

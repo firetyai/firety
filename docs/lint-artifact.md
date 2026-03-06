@@ -13,6 +13,7 @@ The artifact is a stable product contract for a lint run. It is separate from Fi
 - compare mode can also write a versioned compare artifact for diff-style review workflows
 - `firety skill baseline save --output <path>` writes a sibling saved-baseline snapshot artifact for explicit accepted references
 - `firety skill baseline compare --artifact <path>` writes a sibling baseline-compare artifact for regression workflows against saved snapshots
+- `firety skill compatibility --artifact <path>` writes a sibling compatibility artifact with support posture, profile summaries, backend summaries, blockers, and strengths
 - `firety skill eval-compare --backend ... --artifact <path>` writes a sibling multi-backend compare artifact with per-backend version deltas and disagreement changes
 - `firety skill analyze --artifact <path>` writes a sibling combined analysis artifact that includes lint, eval, and correlation data
 - `firety skill eval --backend ... --artifact <path>` writes a sibling multi-backend eval artifact with per-backend measured results
@@ -126,6 +127,15 @@ For baseline compare mode, Firety writes another sibling artifact type with:
 - `tool`
 - `run`
 - `comparison`
+- `fingerprint`
+
+For compatibility mode, Firety writes another sibling artifact type with:
+
+- `schema_version`
+- `artifact_type`
+- `tool`
+- `run`
+- `report`
 - `fingerprint`
 
 ## Important fields

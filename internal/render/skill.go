@@ -46,6 +46,12 @@ func RenderArtifact(path string, mode Mode) (string, error) {
 	}
 
 	switch envelope.ArtifactType {
+	case "firety.skill-compatibility":
+		var value artifact.SkillCompatibilityArtifact
+		if err := json.Unmarshal(data, &value); err != nil {
+			return "", err
+		}
+		return renderCompatibilityArtifact(path, value, mode), nil
 	case "firety.skill-baseline":
 		var value artifact.SkillBaselineSnapshotArtifact
 		if err := json.Unmarshal(data, &value); err != nil {
@@ -121,6 +127,46 @@ func RenderArtifact(path string, mode Mode) (string, error) {
 	default:
 		return "", fmt.Errorf("unsupported artifact type %q", envelope.ArtifactType)
 	}
+}
+
+func renderCompatibilityArtifact(path string, value artifact.SkillCompatibilityArtifact, mode Mode) string {
+	var b strings.Builder
+	writeTitle(&b, mode, "Firety Compatibility")
+	writeLine(&b, fmt.Sprintf("Support posture: %s", string(value.Report.SupportPosture)))
+	writeLine(&b, fmt.Sprintf("Evidence: %s", string(value.Report.EvidenceLevel)))
+	writeLine(&b, fmt.Sprintf("Summary: %s", value.Report.Summary))
+	if len(value.Report.Blockers) > 0 {
+		writeSectionHeader(&b, mode, "Review first")
+		for _, item := range firstStrings(value.Report.Blockers, 3) {
+			writeBullet(&b, item)
+		}
+	}
+	if mode != ModePRComment && len(value.Report.Strengths) > 0 {
+		writeSectionHeader(&b, mode, "Strengths")
+		for _, item := range firstStrings(value.Report.Strengths, 3) {
+			writeBullet(&b, item)
+		}
+	}
+	if mode == ModeFullReport {
+		if len(value.Report.Profiles) > 0 {
+			writeSectionHeader(&b, mode, "Profiles")
+			for _, profile := range value.Report.Profiles {
+				writeBullet(&b, fmt.Sprintf("%s: %s", profile.DisplayName, profile.Summary))
+			}
+		}
+		if len(value.Report.Backends) > 0 {
+			writeSectionHeader(&b, mode, "Backends")
+			for _, backend := range value.Report.Backends {
+				writeBullet(&b, fmt.Sprintf("%s: %s", backend.BackendName, backend.Summary))
+			}
+		}
+		if value.Report.RecommendedPositioning != "" {
+			writeSectionHeader(&b, mode, "Positioning")
+			writeBullet(&b, value.Report.RecommendedPositioning)
+		}
+		writeLine(&b, fmt.Sprintf("Artifact: %s", path))
+	}
+	return strings.TrimSpace(b.String()) + "\n"
 }
 
 func renderBaselineSnapshotArtifact(path string, value artifact.SkillBaselineSnapshotArtifact, mode Mode) string {

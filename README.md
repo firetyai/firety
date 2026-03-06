@@ -19,6 +19,7 @@ firety skill plan [path]
 firety skill analyze [path]
 firety skill eval [path]
 firety skill eval-compare <base> <candidate>
+firety skill gate [path]
 firety skill compare <base> <candidate>
 firety skill render <artifact>
 firety skill rules
@@ -109,8 +110,13 @@ firety skill plan ./path/to/skill
 firety skill plan ./path/to/skill --runner ./routing-runner
 firety skill plan ./path/to/skill --backend codex=./codex-runner --backend claude-code=./claude-runner
 firety skill plan ./path/to/skill --format json --artifact ./plan-artifact.json
+firety skill gate ./path/to/skill
+firety skill gate ./path/to/skill --runner ./routing-runner
+firety skill gate ./path/to/skill --base ./before --runner ./routing-runner --max-pass-rate-regression 0
+firety skill gate --input-artifact ./analysis-artifact.json --max-false-positives 0
 firety skill render ./analysis-artifact.json --render pr-comment
 firety skill render ./compare-artifact.json --render ci-summary
+firety skill render ./gate-artifact.json --render ci-summary
 firety skill render ./plan-artifact.json --render full-report
 firety benchmark run
 firety benchmark run --format json --artifact ./benchmark-artifact.json
@@ -144,12 +150,14 @@ The rule catalog is also a first-class product surface:
 
 - `firety skill rules` lists the full rule catalog in text form
 - `firety skill rules --format json` exports the same catalog in a stable machine-readable form
+- `firety skill gate` turns selected Firety evidence into a deterministic PASS/FAIL policy decision
 - `firety skill render <artifact> --render pr-comment|ci-summary|full-report` turns existing artifacts into reviewer-friendly summaries without rerunning analysis
 - `firety benchmark run` turns Firety's built-in benchmark corpus into a structured maintainer/public quality summary
 - `firety benchmark render <artifact> --render pr-comment|ci-summary|full-report` renders saved benchmark artifacts without rerunning the corpus
 - dedicated rule documentation lives in [docs/lint-rules.md](docs/lint-rules.md)
 - the versioned lint artifact format is documented in [docs/lint-artifact.md](docs/lint-artifact.md)
 - routing eval behavior and the local suite/runner format are documented in [docs/skill-eval.md](docs/skill-eval.md)
+- quality gate behavior is documented in [docs/quality-gate.md](docs/quality-gate.md)
 - benchmark reporting is documented in [docs/benchmark-reporting.md](docs/benchmark-reporting.md)
 - Firety also maintains a curated benchmark corpus and regression suite to protect lint quality over time
 
@@ -190,6 +198,17 @@ Benchmark reporting:
 - the first version is lint-benchmark focused; it demonstrates benchmark stability, low-noise behavior, and invariant coverage for the built-in fixtures
 - benchmark artifacts are intended for future CI summaries, historical comparisons, and hosted/public benchmark pages without requiring those systems yet
 - benchmark output is deterministic and reviewer-friendly rather than a large raw fixture dump
+
+Quality gate:
+
+- `firety skill gate` evaluates explicit selected criteria against Firety's existing lint, eval, compare, and multi-backend evidence
+- default behavior is intentionally operational rather than hidden:
+  - if lint evidence is present, the default gate blocks on lint errors
+  - if eval evidence is present, the default gate requires a 100% pass rate
+  - if multi-backend eval evidence is present, the default gate requires a 100% pass rate on each backend
+- compare-aware thresholds are opt-in and include pass-rate regression, false-positive increase, false-negative increase, widened backend disagreements, new error findings, and new portability regressions
+- `--input-artifact <path>` allows artifact-based gating without rerunning analysis, as long as the selected criteria are supported by the supplied evidence
+- PASS/FAIL is always tied to explicit selected criteria; Firety does not hide extra policy logic behind the command
 
 Strictness philosophy:
 

@@ -55,6 +55,7 @@ func newSkillCommand(application *app.App) *cobra.Command {
 	cmd.AddCommand(newSkillAnalyzeCommand(application))
 	cmd.AddCommand(newSkillEvalCommand(application))
 	cmd.AddCommand(newSkillEvalCompareCommand(application))
+	cmd.AddCommand(newSkillGateCommand(application))
 	cmd.AddCommand(newSkillCompareCommand(application))
 	cmd.AddCommand(newSkillRenderCommand())
 	cmd.AddCommand(newSkillRulesCommand())

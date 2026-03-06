@@ -15,6 +15,7 @@ The artifact is a stable product contract for a lint run. It is separate from Fi
 - `firety skill analyze --artifact <path>` writes a sibling combined analysis artifact that includes lint, eval, and correlation data
 - `firety skill eval --backend ... --artifact <path>` writes a sibling multi-backend eval artifact with per-backend measured results
 - `firety skill plan --artifact <path>` writes a sibling improvement-plan artifact with prioritized remediation items and supporting evidence
+- `firety skill gate --artifact <path>` writes a sibling quality-gate artifact with a deterministic PASS or FAIL decision plus the selected policy criteria and blocking reasons
 - `firety skill render <artifact> --render pr-comment|ci-summary|full-report` renders those artifacts into reviewer-friendly summaries without re-running analysis
 
 ## Versioning
@@ -97,6 +98,15 @@ For multi-backend eval compare mode, Firety writes another sibling artifact type
 - optional `differing_cases`
 - optional `widened_disagreements`
 - optional `narrowed_disagreements`
+- `fingerprint`
+
+For quality-gate mode, Firety writes another sibling artifact type with:
+
+- `schema_version`
+- `artifact_type`
+- `tool`
+- `run`
+- `result`
 - `fingerprint`
 
 ## Important fields
@@ -205,6 +215,12 @@ Analysis artifacts are intended for workflows such as:
 - PR summaries that connect measured misses to likely lint contributors
 - hosted reporting that wants one combined skill-quality payload
 - dashboards that track routing risk, eval misses, and likely improvement priorities together
+
+Quality-gate artifacts are intended for workflows such as:
+
+- CI pass/fail enforcement that wants a stable machine-readable decision record
+- release checks that need explicit blocking reasons rather than raw analyzer output
+- future PR or hosted report layers that should render gate decisions without re-running Firety
 
 Compare mode analyzes Firety's own lint outputs for a base and candidate skill directory. It does not attempt to diff raw markdown semantically or predict runtime behavior directly.
 

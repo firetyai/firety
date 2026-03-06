@@ -10,6 +10,7 @@ import (
 	"github.com/firety/firety/internal/benchmark"
 	"github.com/firety/firety/internal/domain/analysis"
 	domaineval "github.com/firety/firety/internal/domain/eval"
+	"github.com/firety/firety/internal/domain/gate"
 )
 
 type Mode string
@@ -45,6 +46,12 @@ func RenderArtifact(path string, mode Mode) (string, error) {
 	}
 
 	switch envelope.ArtifactType {
+	case "firety.skill-quality-gate":
+		var value artifact.SkillGateArtifact
+		if err := json.Unmarshal(data, &value); err != nil {
+			return "", err
+		}
+		return renderGateArtifact(path, value, mode), nil
 	case "firety.benchmark-report":
 		var value artifact.BenchmarkArtifact
 		if err := json.Unmarshal(data, &value); err != nil {
@@ -138,6 +145,33 @@ func renderBenchmarkArtifact(path string, value artifact.BenchmarkArtifact, mode
 				writeBullet(&b, item)
 			}
 		}
+		writeLine(&b, fmt.Sprintf("Artifact: %s", path))
+	}
+	return strings.TrimSpace(b.String()) + "\n"
+}
+
+func renderGateArtifact(path string, value artifact.SkillGateArtifact, mode Mode) string {
+	var b strings.Builder
+	writeTitle(&b, mode, "Firety Quality Gate")
+	writeLine(&b, fmt.Sprintf("Status: %s", strings.ToUpper(string(value.Result.Decision))))
+	writeLine(&b, fmt.Sprintf("Summary: %s", value.Result.Summary))
+	if len(value.Result.BlockingReasons) > 0 {
+		writeSectionHeader(&b, mode, "Blocking reasons")
+		for _, item := range firstGateReasonSummaries(value.Result.BlockingReasons, 4) {
+			writeBullet(&b, item)
+		}
+	}
+	if len(value.Result.Warnings) > 0 && mode != ModePRComment {
+		writeSectionHeader(&b, mode, "Warnings")
+		for _, item := range firstGateReasonSummaries(value.Result.Warnings, 3) {
+			writeBullet(&b, item)
+		}
+	}
+	if value.Result.NextAction != "" {
+		writeSectionHeader(&b, mode, "Next action")
+		writeBullet(&b, value.Result.NextAction)
+	}
+	if mode == ModeFullReport {
 		writeLine(&b, fmt.Sprintf("Artifact: %s", path))
 	}
 	return strings.TrimSpace(b.String()) + "\n"
@@ -473,6 +507,17 @@ func firstMultiCompareCaseSummaries(values []domaineval.MultiBackendEvalCaseDelt
 	items := make([]string, 0, limit)
 	for _, item := range values {
 		items = append(items, fmt.Sprintf("%s: %s", item.ID, item.Prompt))
+		if len(items) == limit {
+			break
+		}
+	}
+	return items
+}
+
+func firstGateReasonSummaries(values []gate.Reason, limit int) []string {
+	items := make([]string, 0, limit)
+	for _, item := range values {
+		items = append(items, item.Summary)
 		if len(items) == limit {
 			break
 		}

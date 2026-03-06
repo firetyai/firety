@@ -17,6 +17,7 @@ type Services struct {
 	SkillEvalCompare service.SkillEvalCompareService
 	SkillAnalyze     service.SkillAnalyzeService
 	SkillPlan        service.SkillPlanService
+	SkillGate        service.SkillGateService
 	Benchmark        service.BenchmarkService
 }
 
@@ -28,6 +29,8 @@ type App struct {
 func New(version VersionInfo) *App {
 	skillLint := service.NewSkillLinter()
 	skillEval := service.NewSkillEvalService()
+	skillCompare := service.NewSkillCompareService(skillLint)
+	skillEvalCompare := service.NewSkillEvalCompareService(skillEval)
 
 	return &App{
 		Version: version,
@@ -35,11 +38,12 @@ func New(version VersionInfo) *App {
 			Placeholder:      service.NewPlaceholderService(),
 			SkillLint:        skillLint,
 			SkillFix:         service.NewSkillFixer(),
-			SkillCompare:     service.NewSkillCompareService(skillLint),
+			SkillCompare:     skillCompare,
 			SkillEval:        skillEval,
-			SkillEvalCompare: service.NewSkillEvalCompareService(skillEval),
+			SkillEvalCompare: skillEvalCompare,
 			SkillAnalyze:     service.NewSkillAnalyzeService(skillLint, skillEval),
 			SkillPlan:        service.NewSkillPlanService(skillLint, skillEval),
+			SkillGate:        service.NewSkillGateService(skillLint, skillCompare, skillEval, skillEvalCompare),
 			Benchmark:        service.NewBenchmarkService(skillLint),
 		},
 	}

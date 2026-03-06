@@ -31,6 +31,7 @@ type Criteria struct {
 	MaxWidenedDisagreements     *int                   `json:"max_widened_disagreements,omitempty"`
 	FailOnNewErrors             bool                   `json:"fail_on_new_errors,omitempty"`
 	FailOnNewPortabilityRegress bool                   `json:"fail_on_new_portability_regressions,omitempty"`
+	FailOnRoutingRiskRegression bool                   `json:"fail_on_routing_risk_regression,omitempty"`
 }
 
 type LintFindingRef struct {
@@ -148,6 +149,7 @@ type CompareMetrics struct {
 	LintOverall               string   `json:"lint_overall,omitempty"`
 	EvalOverall               string   `json:"eval_overall,omitempty"`
 	MultiBackendOverall       string   `json:"multi_backend_overall,omitempty"`
+	RoutingRiskRegression     bool     `json:"routing_risk_regression,omitempty"`
 	PassRateRegression        *float64 `json:"pass_rate_regression,omitempty"`
 	FalsePositiveIncrease     *int     `json:"false_positive_increase,omitempty"`
 	FalseNegativeIncrease     *int     `json:"false_negative_increase,omitempty"`
@@ -427,6 +429,19 @@ func Evaluate(criteria Criteria, evidence Evidence) (Result, error) {
 		}
 	}
 
+	if criteria.FailOnRoutingRiskRegression {
+		if evidence.LintCompare == nil || evidence.LintCompare.RoutingRiskDelta == nil {
+			return Result{}, fmt.Errorf("fail on routing risk regression criterion requires lint compare evidence")
+		}
+		if evidence.LintCompare.RoutingRiskDelta.Status == lint.RoutingRiskRegressed {
+			result.BlockingReasons = append(result.BlockingReasons, Reason{
+				Code:    "gate.routing-risk-regressed",
+				Title:   "Routing risk regressed versus the baseline",
+				Summary: fmt.Sprintf("Routing risk worsened from %s to %s.", evidence.LintCompare.RoutingRiskDelta.BaseOverallRisk, evidence.LintCompare.RoutingRiskDelta.CandidateOverallRisk),
+			})
+		}
+	}
+
 	appendNonBlockingWarnings(&result, evidence)
 
 	if len(result.BlockingReasons) > 0 {
@@ -553,6 +568,7 @@ func buildMetrics(lintCurrent *LintCurrentEvidence, evalCurrent *EvalCurrentEvid
 			compare.LintOverall = string(evidence.LintCompare.Summary.Overall)
 			compare.NewErrorFindings = len(newErrorRuleIDs(*evidence.LintCompare))
 			compare.NewPortabilityRegressions = len(newPortabilityRegressionRuleIDs(*evidence.LintCompare))
+			compare.RoutingRiskRegression = evidence.LintCompare.RoutingRiskDelta != nil && evidence.LintCompare.RoutingRiskDelta.Status == lint.RoutingRiskRegressed
 		}
 		if evidence.EvalCompare != nil {
 			compare.EvalOverall = string(evidence.EvalCompare.Comparison.Summary.Overall)

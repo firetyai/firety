@@ -18,6 +18,7 @@ type Services struct {
 	SkillAnalyze     service.SkillAnalyzeService
 	SkillPlan        service.SkillPlanService
 	SkillGate        service.SkillGateService
+	SkillBaseline    service.SkillBaselineService
 	Benchmark        service.BenchmarkService
 }
 
@@ -44,6 +45,7 @@ func New(version VersionInfo) *App {
 			SkillAnalyze:     service.NewSkillAnalyzeService(skillLint, skillEval),
 			SkillPlan:        service.NewSkillPlanService(skillLint, skillEval),
 			SkillGate:        service.NewSkillGateService(skillLint, skillCompare, skillEval, skillEvalCompare),
+			SkillBaseline:    service.NewSkillBaselineService(skillLint, skillEval),
 			Benchmark:        service.NewBenchmarkService(skillLint),
 		},
 	}

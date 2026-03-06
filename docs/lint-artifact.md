@@ -11,6 +11,8 @@ The artifact is a stable product contract for a lint run. It is separate from Fi
 - `--format sarif` stays a SARIF interoperability format
 - `--artifact <path>` writes the richer versioned artifact to a file
 - compare mode can also write a versioned compare artifact for diff-style review workflows
+- `firety skill baseline save --output <path>` writes a sibling saved-baseline snapshot artifact for explicit accepted references
+- `firety skill baseline compare --artifact <path>` writes a sibling baseline-compare artifact for regression workflows against saved snapshots
 - `firety skill eval-compare --backend ... --artifact <path>` writes a sibling multi-backend compare artifact with per-backend version deltas and disagreement changes
 - `firety skill analyze --artifact <path>` writes a sibling combined analysis artifact that includes lint, eval, and correlation data
 - `firety skill eval --backend ... --artifact <path>` writes a sibling multi-backend eval artifact with per-backend measured results
@@ -107,6 +109,23 @@ For quality-gate mode, Firety writes another sibling artifact type with:
 - `tool`
 - `run`
 - `result`
+- `fingerprint`
+
+For baseline snapshot mode, Firety writes another sibling artifact type with:
+
+- `schema_version`
+- `artifact_type`
+- `tool`
+- `snapshot`
+- `fingerprint`
+
+For baseline compare mode, Firety writes another sibling artifact type with:
+
+- `schema_version`
+- `artifact_type`
+- `tool`
+- `run`
+- `comparison`
 - `fingerprint`
 
 ## Important fields
@@ -221,6 +240,12 @@ Quality-gate artifacts are intended for workflows such as:
 - CI pass/fail enforcement that wants a stable machine-readable decision record
 - release checks that need explicit blocking reasons rather than raw analyzer output
 - future PR or hosted report layers that should render gate decisions without re-running Firety
+
+Baseline snapshot artifacts are intended for workflows such as:
+
+- storing an explicit accepted quality reference in a repository or release pipeline
+- comparing later skill revisions against a known-good snapshot without supplying a second live path
+- baseline-aware quality gating in CI
 
 Compare mode analyzes Firety's own lint outputs for a base and candidate skill directory. It does not attempt to diff raw markdown semantically or predict runtime behavior directly.
 

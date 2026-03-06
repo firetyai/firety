@@ -18,6 +18,7 @@ type SkillGateArtifactOptions struct {
 	Format         string
 	Target         string
 	BaseTarget     string
+	BaselinePath   string
 	Profile        string
 	Strictness     string
 	SuitePath      string
@@ -38,6 +39,7 @@ type SkillGateArtifact struct {
 type SkillGateArtifactRun struct {
 	Target         string   `json:"target,omitempty"`
 	BaseTarget     string   `json:"base_target,omitempty"`
+	BaselinePath   string   `json:"baseline_path,omitempty"`
 	Profile        string   `json:"profile"`
 	Strictness     string   `json:"strictness"`
 	SuitePath      string   `json:"suite_path,omitempty"`
@@ -61,6 +63,7 @@ func BuildSkillGateArtifact(version app.VersionInfo, result gate.Result, options
 		Run: SkillGateArtifactRun{
 			Target:         options.Target,
 			BaseTarget:     options.BaseTarget,
+			BaselinePath:   options.BaselinePath,
 			Profile:        options.Profile,
 			Strictness:     options.Strictness,
 			SuitePath:      options.SuitePath,
@@ -107,6 +110,7 @@ func skillGateArtifactFingerprint(artifact SkillGateArtifact) string {
 		SchemaVersion string      `json:"schema_version"`
 		Target        string      `json:"target,omitempty"`
 		BaseTarget    string      `json:"base_target,omitempty"`
+		BaselinePath  string      `json:"baseline_path,omitempty"`
 		Profile       string      `json:"profile"`
 		Strictness    string      `json:"strictness"`
 		SuitePath     string      `json:"suite_path,omitempty"`
@@ -118,6 +122,7 @@ func skillGateArtifactFingerprint(artifact SkillGateArtifact) string {
 		SchemaVersion: artifact.SchemaVersion,
 		Target:        artifact.Run.Target,
 		BaseTarget:    artifact.Run.BaseTarget,
+		BaselinePath:  artifact.Run.BaselinePath,
 		Profile:       artifact.Run.Profile,
 		Strictness:    artifact.Run.Strictness,
 		SuitePath:     artifact.Run.SuitePath,

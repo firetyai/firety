@@ -11,7 +11,9 @@ type gateArtifactEnvelope struct {
 
 type gateSkillLintArtifact struct {
 	Run struct {
-		Target string `json:"target"`
+		Target     string `json:"target"`
+		Profile    string `json:"profile"`
+		Strictness string `json:"strictness"`
 	} `json:"run"`
 	Summary struct {
 		ErrorCount   int `json:"error_count"`
@@ -31,7 +33,10 @@ type gateSkillLintArtifactFinding struct {
 
 type gateSkillAnalysisArtifact struct {
 	Run struct {
-		Target string `json:"target"`
+		Target     string `json:"target"`
+		Profile    string `json:"profile"`
+		Strictness string `json:"strictness"`
+		Runner     string `json:"runner,omitempty"`
 	} `json:"run"`
 	Lint struct {
 		Summary struct {
@@ -80,6 +85,7 @@ type gateSkillLintCompareChanged struct {
 type gateSkillEvalArtifact struct {
 	Run struct {
 		Target string `json:"target"`
+		Runner string `json:"runner,omitempty"`
 	} `json:"run"`
 	Suite   domaineval.RoutingEvalSuiteInfo    `json:"suite"`
 	Backend domaineval.RoutingEvalBackendInfo  `json:"backend"`
@@ -128,4 +134,25 @@ type gateSkillEvalMultiCompareArtifact struct {
 	DifferingCases        []domaineval.MultiBackendEvalCaseDelta       `json:"differing_cases,omitempty"`
 	WidenedDisagreements  []domaineval.MultiBackendEvalCaseDelta       `json:"widened_disagreements,omitempty"`
 	NarrowedDisagreements []domaineval.MultiBackendEvalCaseDelta       `json:"narrowed_disagreements,omitempty"`
+}
+
+type gateSkillBaselineCompareArtifact struct {
+	Run struct {
+		BaselinePath  string `json:"baseline_path"`
+		CurrentTarget string `json:"current_target"`
+	} `json:"run"`
+	Comparison struct {
+		BaselineTarget string `json:"baseline_target"`
+		CurrentTarget  string `json:"current_target"`
+		CurrentSummary struct {
+			ErrorCount          int                   `json:"error_count"`
+			WarningCount        int                   `json:"warning_count"`
+			RoutingRisk         lint.RoutingRiskLevel `json:"routing_risk"`
+			HasEval             bool                  `json:"has_eval"`
+			HasMultiBackendEval bool                  `json:"has_multi_backend_eval"`
+		} `json:"current_summary"`
+		LintComparison         *lint.ReportComparison                 `json:"lint_comparison,omitempty"`
+		EvalComparison         *domaineval.RoutingEvalComparison      `json:"eval_comparison,omitempty"`
+		MultiBackendComparison *domaineval.MultiBackendEvalComparison `json:"multi_backend_comparison,omitempty"`
+	} `json:"comparison"`
 }

@@ -15,6 +15,7 @@ The goal of this foundation is to make future growth predictable without turning
 
 ```text
 firety skill lint [path]
+firety skill baseline
 firety skill plan [path]
 firety skill analyze [path]
 firety skill eval [path]
@@ -48,6 +49,8 @@ firety skill lint ./path/to/skill --explain
 firety skill lint ./path/to/skill --strictness strict
 firety skill lint ./path/to/skill --artifact ./lint-artifact.json
 firety skill lint ./path/to/skill --routing-risk
+firety skill baseline save ./path/to/skill --output ./baseline.json
+firety skill baseline compare ./path/to/skill --baseline ./baseline.json
 firety skill eval ./path/to/skill --runner ./routing-runner
 firety skill eval ./path/to/skill --format json --artifact ./eval-artifact.json
 firety skill eval ./path/to/skill --backend codex=./codex-runner --backend claude-code=./claude-runner
@@ -113,6 +116,7 @@ firety skill plan ./path/to/skill --format json --artifact ./plan-artifact.json
 firety skill gate ./path/to/skill
 firety skill gate ./path/to/skill --runner ./routing-runner
 firety skill gate ./path/to/skill --base ./before --runner ./routing-runner --max-pass-rate-regression 0
+firety skill gate ./path/to/skill --baseline ./baseline.json --fail-on-routing-risk-regression
 firety skill gate --input-artifact ./analysis-artifact.json --max-false-positives 0
 firety skill render ./analysis-artifact.json --render pr-comment
 firety skill render ./compare-artifact.json --render ci-summary
@@ -150,6 +154,7 @@ The rule catalog is also a first-class product surface:
 
 - `firety skill rules` lists the full rule catalog in text form
 - `firety skill rules --format json` exports the same catalog in a stable machine-readable form
+- `firety skill baseline` manages explicit saved baseline snapshots for long-lived regression workflows
 - `firety skill gate` turns selected Firety evidence into a deterministic PASS/FAIL policy decision
 - `firety skill render <artifact> --render pr-comment|ci-summary|full-report` turns existing artifacts into reviewer-friendly summaries without rerunning analysis
 - `firety benchmark run` turns Firety's built-in benchmark corpus into a structured maintainer/public quality summary
@@ -157,6 +162,7 @@ The rule catalog is also a first-class product surface:
 - dedicated rule documentation lives in [docs/lint-rules.md](docs/lint-rules.md)
 - the versioned lint artifact format is documented in [docs/lint-artifact.md](docs/lint-artifact.md)
 - routing eval behavior and the local suite/runner format are documented in [docs/skill-eval.md](docs/skill-eval.md)
+- baseline snapshot workflows are documented in [docs/baselines.md](docs/baselines.md)
 - quality gate behavior is documented in [docs/quality-gate.md](docs/quality-gate.md)
 - benchmark reporting is documented in [docs/benchmark-reporting.md](docs/benchmark-reporting.md)
 - Firety also maintains a curated benchmark corpus and regression suite to protect lint quality over time
@@ -207,8 +213,18 @@ Quality gate:
   - if eval evidence is present, the default gate requires a 100% pass rate
   - if multi-backend eval evidence is present, the default gate requires a 100% pass rate on each backend
 - compare-aware thresholds are opt-in and include pass-rate regression, false-positive increase, false-negative increase, widened backend disagreements, new error findings, and new portability regressions
+- `--baseline <path>` evaluates the current skill against a saved baseline snapshot instead of requiring a live `--base` directory
+- `--fail-on-routing-risk-regression` blocks when routing risk worsens versus the selected base or saved baseline
 - `--input-artifact <path>` allows artifact-based gating without rerunning analysis, as long as the selected criteria are supported by the supplied evidence
 - PASS/FAIL is always tied to explicit selected criteria; Firety does not hide extra policy logic behind the command
+
+Baseline snapshots:
+
+- `firety skill baseline save [path] --output <file>` saves an explicit accepted Firety snapshot
+- `firety skill baseline compare [path] --baseline <file>` compares the current skill against that saved snapshot
+- `firety skill baseline update [path] --baseline <file>` intentionally refreshes the saved snapshot after review
+- baseline snapshots capture the saved profile, strictness, suite, and backend context needed for later regression checks
+- baseline workflows are meant for long-lived CI and release management, not as a general history store
 
 Strictness philosophy:
 

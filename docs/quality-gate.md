@@ -31,6 +31,14 @@ firety skill gate ./after --base ./before --runner ./routing-runner --max-pass-r
 firety skill gate ./after --base ./before --backend codex=./codex-runner --backend cursor=./cursor-runner --max-widened-disagreements 0
 ```
 
+Gate the current skill against a saved baseline snapshot:
+
+```bash
+firety skill gate ./path/to/skill --baseline ./baseline.json
+firety skill gate ./path/to/skill --baseline ./baseline.json --fail-on-new-errors
+firety skill gate ./path/to/skill --baseline ./baseline.json --fail-on-routing-risk-regression
+```
+
 Gate from saved artifacts without rerunning analysis:
 
 ```bash
@@ -74,6 +82,7 @@ Current criteria are explicit command flags, not a general policy language:
 - `--max-widened-disagreements`
 - `--fail-on-new-errors`
 - `--fail-on-new-portability-regressions`
+- `--fail-on-routing-risk-regression`
 
 Percentage-based CLI flags use `0` to `100`. Firety normalizes those to internal fractional values in machine-readable outputs.
 

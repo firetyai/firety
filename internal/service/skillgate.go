@@ -6,6 +6,7 @@ import (
 	"os"
 	"slices"
 
+	"github.com/firety/firety/internal/domain/baseline"
 	domaineval "github.com/firety/firety/internal/domain/eval"
 	"github.com/firety/firety/internal/domain/gate"
 	"github.com/firety/firety/internal/domain/lint"
@@ -13,6 +14,7 @@ import (
 
 type SkillGateOptions struct {
 	BasePath          string
+	BaselinePath      string
 	Profile           SkillLintProfile
 	Strictness        lint.Strictness
 	SuitePath         string
@@ -72,6 +74,10 @@ func (s SkillGateService) Evaluate(target string, options SkillGateOptions) (Ski
 }
 
 func (s SkillGateService) loadFreshEvidence(evidence *gate.Evidence, target string, options SkillGateOptions) error {
+	if options.BaselinePath != "" {
+		return s.loadBaselineEvidence(evidence, target, options)
+	}
+
 	if options.BasePath != "" {
 		compareResult, err := s.lintCompare.Compare(options.BasePath, target, options.Profile, options.Strictness)
 		if err != nil {
@@ -146,6 +152,48 @@ func (s SkillGateService) loadFreshEvidence(evidence *gate.Evidence, target stri
 			return err
 		}
 		if err := assignGateEvalCurrent(evidence, evalCurrentEvidenceFromReport(report), "fresh eval"); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func (s SkillGateService) loadBaselineEvidence(evidence *gate.Evidence, target string, options SkillGateOptions) error {
+	result, err := NewSkillBaselineService(s.linter, s.eval).Compare(target, SkillBaselineCompareOptions{
+		BaselinePath:      options.BaselinePath,
+		Runner:            options.Runner,
+		BackendSelections: options.BackendSelections,
+	})
+	if err != nil {
+		return err
+	}
+
+	if err := assignGateLintCurrent(evidence, lintCurrentEvidenceFromReport(result.Current.LintReport), "baseline lint"); err != nil {
+		return err
+	}
+	if err := assignGateLintCompare(evidence, lintCompareEvidenceFromBaselineComparison(result.Comparison), "baseline lint compare"); err != nil {
+		return err
+	}
+
+	if result.Current.EvalReport != nil {
+		if err := assignGateEvalCurrent(evidence, evalCurrentEvidenceFromReport(*result.Current.EvalReport), "baseline eval"); err != nil {
+			return err
+		}
+	}
+	if result.Comparison.EvalComparison != nil {
+		if err := assignGateEvalCompare(evidence, evalCompareEvidenceFromBaselineComparison(result.Comparison), "baseline eval compare"); err != nil {
+			return err
+		}
+	}
+
+	if result.Current.MultiBackendEval != nil {
+		if err := assignGateMultiCurrent(evidence, multiBackendCurrentEvidenceFromReport(*result.Current.MultiBackendEval), "baseline multi-backend eval"); err != nil {
+			return err
+		}
+	}
+	if result.Comparison.MultiBackendComparison != nil {
+		if err := assignGateMultiCompare(evidence, multiBackendCompareEvidenceFromBaselineComparison(result.Comparison), "baseline multi-backend compare"); err != nil {
 			return err
 		}
 	}
@@ -229,6 +277,40 @@ func (s SkillGateService) loadGateArtifact(evidence *gate.Evidence, path string)
 			return err
 		}
 		return assignGateMultiCompare(evidence, multiBackendCompareEvidenceFromArtifact(value), path)
+	case "firety.skill-baseline-compare":
+		var value gateSkillBaselineCompareArtifact
+		if err := json.Unmarshal(content, &value); err != nil {
+			return err
+		}
+		if err := assignGateLintCurrent(evidence, lintCurrentEvidenceFromBaselineCompareArtifact(value), path); err != nil {
+			return err
+		}
+		if lintCompare := lintCompareEvidenceFromBaselineCompareArtifact(value); lintCompare != nil {
+			if err := assignGateLintCompare(evidence, lintCompare, path); err != nil {
+				return err
+			}
+		}
+		if evalCurrent := evalCurrentEvidenceFromBaselineCompareArtifact(value); evalCurrent != nil {
+			if err := assignGateEvalCurrent(evidence, evalCurrent, path); err != nil {
+				return err
+			}
+		}
+		if evalCompare := evalCompareEvidenceFromBaselineCompareArtifact(value); evalCompare != nil {
+			if err := assignGateEvalCompare(evidence, evalCompare, path); err != nil {
+				return err
+			}
+		}
+		if multiCurrent := multiBackendCurrentEvidenceFromBaselineCompareArtifact(value); multiCurrent != nil {
+			if err := assignGateMultiCurrent(evidence, multiCurrent, path); err != nil {
+				return err
+			}
+		}
+		if multiCompare := multiBackendCompareEvidenceFromBaselineCompareArtifact(value); multiCompare != nil {
+			if err := assignGateMultiCompare(evidence, multiCompare, path); err != nil {
+				return err
+			}
+		}
+		return nil
 	default:
 		return fmt.Errorf("artifact %s has unsupported type %q for quality gating", path, envelope.ArtifactType)
 	}
@@ -269,6 +351,20 @@ func lintCompareEvidenceFromResult(result SkillCompareResult) *gate.LintCompareE
 	}
 }
 
+func lintCompareEvidenceFromBaselineComparison(compare baseline.Comparison) *gate.LintCompareEvidence {
+	if compare.LintComparison == nil {
+		return nil
+	}
+	return &gate.LintCompareEvidence{
+		BaseTarget:       compare.BaselineTarget,
+		CandidateTarget:  compare.CurrentTarget,
+		Summary:          compare.LintComparison.Summary,
+		AddedFindings:    gateFindingRefsFromComparison(compare.LintComparison.AddedFindings),
+		ChangedFindings:  gateChangedFindingRefsFromComparison(compare.LintComparison.ChangedFindings),
+		RoutingRiskDelta: &compare.LintComparison.RoutingRiskDelta,
+	}
+}
+
 func evalCurrentEvidenceFromReport(report domaineval.RoutingEvalReport) *gate.EvalCurrentEvidence {
 	return &gate.EvalCurrentEvidence{
 		Target:               report.Target,
@@ -286,6 +382,17 @@ func evalCompareEvidenceFromResult(result SkillEvalCompareResult) *gate.EvalComp
 		BaseTarget:      result.BaseReport.Target,
 		CandidateTarget: result.CandidateReport.Target,
 		Comparison:      result.Comparison,
+	}
+}
+
+func evalCompareEvidenceFromBaselineComparison(compare baseline.Comparison) *gate.EvalCompareEvidence {
+	if compare.EvalComparison == nil {
+		return nil
+	}
+	return &gate.EvalCompareEvidence{
+		BaseTarget:      compare.BaselineTarget,
+		CandidateTarget: compare.CurrentTarget,
+		Comparison:      *compare.EvalComparison,
 	}
 }
 
@@ -309,6 +416,17 @@ func multiBackendCompareEvidenceFromResult(result SkillEvalMultiCompareResult) *
 	}
 }
 
+func multiBackendCompareEvidenceFromBaselineComparison(compare baseline.Comparison) *gate.MultiBackendCompareEvidence {
+	if compare.MultiBackendComparison == nil {
+		return nil
+	}
+	return &gate.MultiBackendCompareEvidence{
+		BaseTarget:      compare.BaselineTarget,
+		CandidateTarget: compare.CurrentTarget,
+		Comparison:      *compare.MultiBackendComparison,
+	}
+}
+
 func lintCurrentEvidenceFromArtifact(value gateSkillLintArtifact) *gate.LintCurrentEvidence {
 	routingRisk := value.RoutingRisk
 	if routingRisk == nil {
@@ -322,6 +440,20 @@ func lintCurrentEvidenceFromArtifact(value gateSkillLintArtifact) *gate.LintCurr
 		RuleIDs:      uniqueArtifactFindingRuleIDs(value.Findings),
 		RoutingRisk:  routingRisk,
 	}
+}
+
+func lintCurrentEvidenceFromBaselineCompareArtifact(value gateSkillBaselineCompareArtifact) *gate.LintCurrentEvidence {
+	evidence := &gate.LintCurrentEvidence{
+		Target:       value.Comparison.CurrentTarget,
+		ErrorCount:   value.Comparison.CurrentSummary.ErrorCount,
+		WarningCount: value.Comparison.CurrentSummary.WarningCount,
+	}
+	if value.Comparison.CurrentSummary.RoutingRisk != "" {
+		evidence.RoutingRisk = &lint.RoutingRiskSummary{
+			OverallRisk: value.Comparison.CurrentSummary.RoutingRisk,
+		}
+	}
+	return evidence
 }
 
 func lintCurrentEvidenceFromAnalysisArtifact(value gateSkillAnalysisArtifact) *gate.LintCurrentEvidence {
@@ -364,6 +496,20 @@ func lintCompareEvidenceFromArtifact(value gateSkillLintCompareArtifact) *gate.L
 	}
 }
 
+func lintCompareEvidenceFromBaselineCompareArtifact(value gateSkillBaselineCompareArtifact) *gate.LintCompareEvidence {
+	if value.Comparison.LintComparison == nil {
+		return nil
+	}
+	return &gate.LintCompareEvidence{
+		BaseTarget:       value.Comparison.BaselineTarget,
+		CandidateTarget:  value.Comparison.CurrentTarget,
+		Summary:          value.Comparison.LintComparison.Summary,
+		AddedFindings:    gateFindingRefsFromComparison(value.Comparison.LintComparison.AddedFindings),
+		ChangedFindings:  gateChangedFindingRefsFromComparison(value.Comparison.LintComparison.ChangedFindings),
+		RoutingRiskDelta: &value.Comparison.LintComparison.RoutingRiskDelta,
+	}
+}
+
 func evalCurrentEvidenceFromArtifact(value gateSkillEvalArtifact) *gate.EvalCurrentEvidence {
 	return &gate.EvalCurrentEvidence{
 		Target:               value.Run.Target,
@@ -373,6 +519,22 @@ func evalCurrentEvidenceFromArtifact(value gateSkillEvalArtifact) *gate.EvalCurr
 		FailedCaseIDs:        failedCaseIDs(value.Results),
 		FalsePositiveCaseIDs: failedCaseIDsByKind(value.Results, domaineval.RoutingFalsePositive),
 		FalseNegativeCaseIDs: failedCaseIDsByKind(value.Results, domaineval.RoutingFalseNegative),
+	}
+}
+
+func evalCurrentEvidenceFromBaselineCompareArtifact(value gateSkillBaselineCompareArtifact) *gate.EvalCurrentEvidence {
+	if value.Comparison.EvalComparison == nil {
+		return nil
+	}
+	compare := value.Comparison.EvalComparison
+	return &gate.EvalCurrentEvidence{
+		Target:               value.Comparison.CurrentTarget,
+		Suite:                compare.Suite,
+		Backend:              compare.Backend,
+		Summary:              compare.Candidate.Summary,
+		FailedCaseIDs:        changedCaseIDs(compare.ChangedCases),
+		FalsePositiveCaseIDs: changedCaseIDsByKind(compare.FlippedToFail, domaineval.RoutingFalsePositive),
+		FalseNegativeCaseIDs: changedCaseIDsByKind(compare.FlippedToFail, domaineval.RoutingFalseNegative),
 	}
 }
 
@@ -416,6 +578,17 @@ func evalCompareEvidenceFromArtifact(value gateSkillEvalCompareArtifact) *gate.E
 	}
 }
 
+func evalCompareEvidenceFromBaselineCompareArtifact(value gateSkillBaselineCompareArtifact) *gate.EvalCompareEvidence {
+	if value.Comparison.EvalComparison == nil {
+		return nil
+	}
+	return &gate.EvalCompareEvidence{
+		BaseTarget:      value.Comparison.BaselineTarget,
+		CandidateTarget: value.Comparison.CurrentTarget,
+		Comparison:      *value.Comparison.EvalComparison,
+	}
+}
+
 func multiBackendCurrentEvidenceFromArtifact(value gateSkillEvalMultiArtifact) *gate.MultiBackendCurrentEvidence {
 	rate := disagreementRate(value.Summary.TotalCases, len(value.DifferingCases))
 	return &gate.MultiBackendCurrentEvidence{
@@ -425,6 +598,29 @@ func multiBackendCurrentEvidenceFromArtifact(value gateSkillEvalMultiArtifact) *
 		Backends:         value.Results,
 		DisagreementRate: &rate,
 		DifferingCaseIDs: differingCaseIDs(value.DifferingCases),
+	}
+}
+
+func multiBackendCurrentEvidenceFromBaselineCompareArtifact(value gateSkillBaselineCompareArtifact) *gate.MultiBackendCurrentEvidence {
+	if value.Comparison.MultiBackendComparison == nil {
+		return nil
+	}
+	compare := value.Comparison.MultiBackendComparison
+	backends := make([]domaineval.BackendEvalReport, 0, len(compare.PerBackend))
+	for _, backend := range compare.PerBackend {
+		backends = append(backends, domaineval.BackendEvalReport{
+			Backend: backend.Backend,
+			Summary: backend.Candidate.Summary,
+		})
+	}
+	rate := disagreementRate(compare.Candidate.Summary.Total, len(compare.DifferingCases))
+	return &gate.MultiBackendCurrentEvidence{
+		Target:           value.Comparison.CurrentTarget,
+		Suite:            compare.Suite,
+		Summary:          domaineval.MultiBackendEvalSummary{BackendCount: len(backends), TotalCases: compare.Candidate.Summary.Total, DifferingCaseCount: len(compare.DifferingCases)},
+		Backends:         backends,
+		DisagreementRate: &rate,
+		DifferingCaseIDs: differingCaseDeltaIDs(compare.DifferingCases),
 	}
 }
 
@@ -459,6 +655,17 @@ func multiBackendCompareEvidenceFromArtifact(value gateSkillEvalMultiCompareArti
 			WidenedDisagreements:  value.WidenedDisagreements,
 			NarrowedDisagreements: value.NarrowedDisagreements,
 		},
+	}
+}
+
+func multiBackendCompareEvidenceFromBaselineCompareArtifact(value gateSkillBaselineCompareArtifact) *gate.MultiBackendCompareEvidence {
+	if value.Comparison.MultiBackendComparison == nil {
+		return nil
+	}
+	return &gate.MultiBackendCompareEvidence{
+		BaseTarget:      value.Comparison.BaselineTarget,
+		CandidateTarget: value.Comparison.CurrentTarget,
+		Comparison:      *value.Comparison.MultiBackendComparison,
 	}
 }
 
@@ -640,6 +847,24 @@ func failedCaseIDsByKind(results []domaineval.RoutingEvalCaseResult, kind domain
 	return values
 }
 
+func changedCaseIDs(changes []domaineval.RoutingEvalCaseChange) []string {
+	values := make([]string, 0, len(changes))
+	for _, change := range changes {
+		values = append(values, change.ID)
+	}
+	return values
+}
+
+func changedCaseIDsByKind(changes []domaineval.RoutingEvalCaseChange, kind domaineval.RoutingFailureKind) []string {
+	values := make([]string, 0, len(changes))
+	for _, change := range changes {
+		if change.CandidateFailureKind == kind {
+			values = append(values, change.ID)
+		}
+	}
+	return values
+}
+
 func disagreementRate(total, differing int) float64 {
 	if total == 0 {
 		return 0
@@ -648,6 +873,14 @@ func disagreementRate(total, differing int) float64 {
 }
 
 func differingCaseIDs(cases []domaineval.MultiBackendDifferingCase) []string {
+	values := make([]string, 0, len(cases))
+	for _, item := range cases {
+		values = append(values, item.ID)
+	}
+	return values
+}
+
+func differingCaseDeltaIDs(cases []domaineval.MultiBackendEvalCaseDelta) []string {
 	values := make([]string, 0, len(cases))
 	for _, item := range cases {
 		values = append(values, item.ID)

@@ -19,6 +19,7 @@ const skillGateJSONSchemaVersion = "1"
 type skillGateOptions struct {
 	format                      string
 	base                        string
+	baseline                    string
 	profile                     string
 	strictness                  string
 	suite                       string
@@ -40,6 +41,7 @@ type skillGateOptions struct {
 	maxWidenedDisagreements     int
 	failOnNewErrors             bool
 	failOnNewPortabilityRegress bool
+	failOnRoutingRiskRegression bool
 }
 
 func newSkillGateCommand(application *app.App) *cobra.Command {
@@ -98,6 +100,7 @@ func newSkillGateCommand(application *app.App) *cobra.Command {
 
 			result, err := application.Services.SkillGate.Evaluate(target, service.SkillGateOptions{
 				BasePath:          options.base,
+				BaselinePath:      options.baseline,
 				Profile:           profile,
 				Strictness:        strictness,
 				SuitePath:         options.suite,
@@ -110,7 +113,7 @@ func newSkillGateCommand(application *app.App) *cobra.Command {
 				return newExitError(ExitCodeRuntime, err)
 			}
 
-			if err := writeSkillGateReport(cmd.OutOrStdout(), result.Gate, target, options.base, options); err != nil {
+			if err := writeSkillGateReport(cmd.OutOrStdout(), result.Gate, target, options); err != nil {
 				return newExitError(ExitCodeRuntime, err)
 			}
 
@@ -124,6 +127,7 @@ func newSkillGateCommand(application *app.App) *cobra.Command {
 					Format:         options.format,
 					Target:         target,
 					BaseTarget:     options.base,
+					BaselinePath:   options.baseline,
 					Profile:        options.profile,
 					Strictness:     strictness.DisplayName(),
 					SuitePath:      options.suite,
@@ -146,6 +150,7 @@ func newSkillGateCommand(application *app.App) *cobra.Command {
 
 	cmd.Flags().StringVar(&options.format, "format", skillLintFormatText, "Output format: text or json")
 	cmd.Flags().StringVar(&options.base, "base", "", "Base skill directory for compare-aware gating")
+	cmd.Flags().StringVar(&options.baseline, "baseline", "", "Saved baseline snapshot artifact for baseline-aware gating")
 	cmd.Flags().StringVar(&options.profile, "profile", string(service.SkillLintProfileGeneric), "Routing profile: generic, codex, claude-code, copilot, or cursor")
 	cmd.Flags().StringVar(&options.strictness, "strictness", string(lint.StrictnessDefault), "Lint strictness: default, strict, or pedantic")
 	cmd.Flags().StringVar(&options.suite, "suite", "", "Path to the local routing eval suite JSON file")
@@ -167,6 +172,7 @@ func newSkillGateCommand(application *app.App) *cobra.Command {
 	cmd.Flags().IntVar(&options.maxWidenedDisagreements, "max-widened-disagreements", -1, "Maximum allowed widened backend disagreements versus base (-1 disables)")
 	cmd.Flags().BoolVar(&options.failOnNewErrors, "fail-on-new-errors", false, "Fail when the candidate introduces new or escalated error findings")
 	cmd.Flags().BoolVar(&options.failOnNewPortabilityRegress, "fail-on-new-portability-regressions", false, "Fail when the candidate introduces new or escalated portability regressions")
+	cmd.Flags().BoolVar(&options.failOnRoutingRiskRegression, "fail-on-routing-risk-regression", false, "Fail when routing risk worsens versus the base or baseline")
 
 	return cmd
 }
@@ -193,6 +199,9 @@ func (o skillGateOptions) Validate() error {
 		if o.profile != string(service.SkillLintProfileGeneric) {
 			return fmt.Errorf("--profile cannot be combined with --backend; multi-backend gating uses each backend's profile affinity")
 		}
+	}
+	if o.base != "" && o.baseline != "" {
+		return fmt.Errorf("--base cannot be combined with --baseline")
 	}
 	if o.artifact == "-" {
 		return fmt.Errorf(`artifact path "-" is not supported; choose a file path`)
@@ -278,21 +287,22 @@ func (o skillGateOptions) Criteria() (gate.Criteria, error) {
 	}
 	criteria.FailOnNewErrors = o.failOnNewErrors
 	criteria.FailOnNewPortabilityRegress = o.failOnNewPortabilityRegress
+	criteria.FailOnRoutingRiskRegression = o.failOnRoutingRiskRegression
 	return criteria, nil
 }
 
-func writeSkillGateReport(w io.Writer, result gate.Result, target, base string, options skillGateOptions) error {
+func writeSkillGateReport(w io.Writer, result gate.Result, target string, options skillGateOptions) error {
 	switch options.format {
 	case skillLintFormatText:
-		return writeSkillGateText(w, result, target, base)
+		return writeSkillGateText(w, result, target, options.base, options.baseline)
 	case skillLintFormatJSON:
-		return writeSkillGateJSON(w, result, target, base, options)
+		return writeSkillGateJSON(w, result, target, options)
 	default:
 		return fmt.Errorf("invalid format %q: must be one of %s, %s", options.format, skillLintFormatText, skillLintFormatJSON)
 	}
 }
 
-func writeSkillGateText(w io.Writer, result gate.Result, target, base string) error {
+func writeSkillGateText(w io.Writer, result gate.Result, target, base, baseline string) error {
 	if target != "" {
 		if _, err := fmt.Fprintf(w, "Target: %s\n", target); err != nil {
 			return err
@@ -300,6 +310,11 @@ func writeSkillGateText(w io.Writer, result gate.Result, target, base string) er
 	}
 	if base != "" {
 		if _, err := fmt.Fprintf(w, "Base: %s\n", base); err != nil {
+			return err
+		}
+	}
+	if baseline != "" {
+		if _, err := fmt.Fprintf(w, "Baseline: %s\n", baseline); err != nil {
 			return err
 		}
 	}
@@ -382,18 +397,20 @@ func writeSkillGateText(w io.Writer, result gate.Result, target, base string) er
 	return nil
 }
 
-func writeSkillGateJSON(w io.Writer, result gate.Result, target, base string, options skillGateOptions) error {
+func writeSkillGateJSON(w io.Writer, result gate.Result, target string, options skillGateOptions) error {
 	payload := struct {
 		SchemaVersion string      `json:"schema_version"`
 		Target        string      `json:"target,omitempty"`
 		BaseTarget    string      `json:"base_target,omitempty"`
+		BaselinePath  string      `json:"baseline_path,omitempty"`
 		Profile       string      `json:"profile"`
 		Strictness    string      `json:"strictness"`
 		Result        gate.Result `json:"result"`
 	}{
 		SchemaVersion: skillGateJSONSchemaVersion,
 		Target:        target,
-		BaseTarget:    base,
+		BaseTarget:    options.base,
+		BaselinePath:  options.baseline,
 		Profile:       options.profile,
 		Strictness:    options.strictness,
 		Result:        result,

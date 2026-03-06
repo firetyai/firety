@@ -46,6 +46,18 @@ func RenderArtifact(path string, mode Mode) (string, error) {
 	}
 
 	switch envelope.ArtifactType {
+	case "firety.skill-baseline":
+		var value artifact.SkillBaselineSnapshotArtifact
+		if err := json.Unmarshal(data, &value); err != nil {
+			return "", err
+		}
+		return renderBaselineSnapshotArtifact(path, value, mode), nil
+	case "firety.skill-baseline-compare":
+		var value artifact.SkillBaselineCompareArtifact
+		if err := json.Unmarshal(data, &value); err != nil {
+			return "", err
+		}
+		return renderBaselineCompareArtifact(path, value, mode), nil
 	case "firety.skill-quality-gate":
 		var value artifact.SkillGateArtifact
 		if err := json.Unmarshal(data, &value); err != nil {
@@ -111,6 +123,65 @@ func RenderArtifact(path string, mode Mode) (string, error) {
 	}
 }
 
+func renderBaselineSnapshotArtifact(path string, value artifact.SkillBaselineSnapshotArtifact, mode Mode) string {
+	var b strings.Builder
+	writeTitle(&b, mode, "Firety Baseline Snapshot")
+	writeLine(&b, fmt.Sprintf("Target: %s", value.Snapshot.Context.Target))
+	writeLine(&b, fmt.Sprintf("Summary: %s", value.Snapshot.Summary.Summary))
+	writeLine(&b, fmt.Sprintf("Scope: %s", value.Snapshot.Summary.Scope))
+	if value.Snapshot.Context.Profile != "" || value.Snapshot.Context.Strictness != "" {
+		writeLine(&b, fmt.Sprintf("Context: profile %s, strictness %s", emptyDefault(value.Snapshot.Context.Profile, "generic"), emptyDefault(value.Snapshot.Context.Strictness, "default")))
+	}
+	if mode == ModeFullReport {
+		if value.Snapshot.Context.SuitePath != "" {
+			writeLine(&b, fmt.Sprintf("Suite: %s", value.Snapshot.Context.SuitePath))
+		}
+		if len(value.Snapshot.Context.Backends) > 0 {
+			writeSectionHeader(&b, mode, "Backends")
+			for _, backend := range value.Snapshot.Context.Backends {
+				label := backend.ID
+				if backend.Runner != "" {
+					label = fmt.Sprintf("%s (%s)", backend.ID, backend.Runner)
+				}
+				writeBullet(&b, label)
+			}
+		}
+		writeLine(&b, fmt.Sprintf("Artifact: %s", path))
+	}
+	return strings.TrimSpace(b.String()) + "\n"
+}
+
+func renderBaselineCompareArtifact(path string, value artifact.SkillBaselineCompareArtifact, mode Mode) string {
+	var b strings.Builder
+	writeTitle(&b, mode, "Firety Baseline Compare")
+	writeLine(&b, fmt.Sprintf("Status: %s", compareStatus(string(value.Comparison.Summary.Overall))))
+	writeLine(&b, fmt.Sprintf("Summary: %s", value.Comparison.Summary.Summary))
+	if len(value.Comparison.Summary.HighPriorityRegressions) > 0 {
+		writeSectionHeader(&b, mode, "Review first")
+		for _, item := range firstStrings(value.Comparison.Summary.HighPriorityRegressions, 3) {
+			writeBullet(&b, item)
+		}
+	}
+	if len(value.Comparison.Summary.NotableImprovements) > 0 && mode != ModePRComment {
+		writeSectionHeader(&b, mode, "Improvements")
+		for _, item := range firstStrings(value.Comparison.Summary.NotableImprovements, 3) {
+			writeBullet(&b, item)
+		}
+	}
+	if mode == ModeFullReport {
+		writeSectionHeader(&b, mode, "Components")
+		for _, component := range value.Comparison.Summary.Components {
+			writeBullet(&b, fmt.Sprintf("%s: %s", component.Title, component.Summary))
+		}
+		if value.Comparison.Summary.UpdateRecommendation != "" {
+			writeSectionHeader(&b, mode, "Recommendation")
+			writeBullet(&b, value.Comparison.Summary.UpdateRecommendation)
+		}
+		writeLine(&b, fmt.Sprintf("Artifact: %s", path))
+	}
+	return strings.TrimSpace(b.String()) + "\n"
+}
+
 func renderBenchmarkArtifact(path string, value artifact.BenchmarkArtifact, mode Mode) string {
 	var b strings.Builder
 	writeTitle(&b, mode, "Firety Benchmark Health")
@@ -172,6 +243,9 @@ func renderGateArtifact(path string, value artifact.SkillGateArtifact, mode Mode
 		writeBullet(&b, value.Result.NextAction)
 	}
 	if mode == ModeFullReport {
+		if value.Run.BaselinePath != "" {
+			writeLine(&b, fmt.Sprintf("Baseline: %s", value.Run.BaselinePath))
+		}
 		writeLine(&b, fmt.Sprintf("Artifact: %s", path))
 	}
 	return strings.TrimSpace(b.String()) + "\n"
@@ -363,6 +437,13 @@ func renderEvalArtifact(path string, value artifact.SkillEvalArtifact, mode Mode
 		writeLine(&b, fmt.Sprintf("Artifact: %s", path))
 	}
 	return strings.TrimSpace(b.String()) + "\n"
+}
+
+func emptyDefault(value, fallback string) string {
+	if strings.TrimSpace(value) == "" {
+		return fallback
+	}
+	return value
 }
 
 func writeTitle(b *strings.Builder, mode Mode, title string) {

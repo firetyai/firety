@@ -19,6 +19,7 @@ The artifact is a stable product contract for a lint run. It is separate from Fi
 - `firety skill eval --backend ... --artifact <path>` writes a sibling multi-backend eval artifact with per-backend measured results
 - `firety skill plan --artifact <path>` writes a sibling improvement-plan artifact with prioritized remediation items and supporting evidence
 - `firety skill gate --artifact <path>` writes a sibling quality-gate artifact with a deterministic PASS or FAIL decision plus the selected policy criteria and blocking reasons
+- `firety skill attest --artifact <path>` writes a sibling attestation artifact with support posture, tested-vs-supported scope, evidence references, claims, and limitations
 - `firety skill render <artifact> --render pr-comment|ci-summary|full-report` renders those artifacts into reviewer-friendly summaries without re-running analysis
 - `firety artifact inspect <artifact>` validates a saved artifact and explains what it contains
 - `firety artifact render <artifact> --render pr-comment|ci-summary|full-report` provides an artifact-first rendering path for offline/reporting workflows

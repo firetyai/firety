@@ -139,6 +139,34 @@ func TestArtifactRenderCommandFromArtifact(t *testing.T) {
 	}
 }
 
+func TestArtifactInspectCommandForAttestationArtifact(t *testing.T) {
+	t.Parallel()
+
+	root := t.TempDir()
+	runner := writeRoutingEvalRunner(t, "good")
+	artifactPath := filepath.Join(t.TempDir(), "attestation.json")
+	testutil.WriteFiles(t, root, testutil.RoutingEvalSkillFiles())
+
+	_, _, _, _ = executeSkillAttest(t, root, "--runner", runner, "--artifact", artifactPath, "--format", "json")
+
+	stdout, stderr, code, err := executeArtifact(t, "inspect", artifactPath)
+	if err != nil {
+		t.Fatalf("expected no runtime error, got %v", err)
+	}
+	if code != cli.ExitCodeOK {
+		t.Fatalf("expected exit code %d, got %d", cli.ExitCodeOK, code)
+	}
+	if stderr != "" {
+		t.Fatalf("expected empty stderr, got %q", stderr)
+	}
+	if !strings.Contains(stdout, "Type: firety.skill-attestation") {
+		t.Fatalf("expected attestation artifact type, got %q", stdout)
+	}
+	if !strings.Contains(stdout, "Origin: firety skill attest") {
+		t.Fatalf("expected attestation origin, got %q", stdout)
+	}
+}
+
 func TestArtifactCompareCommandForLintArtifacts(t *testing.T) {
 	t.Parallel()
 

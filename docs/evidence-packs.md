@@ -2,6 +2,8 @@
 
 Firety evidence packs package saved quality evidence into a deterministic directory for offline review, CI artifacts, release attachments, and future hosted/reporting workflows.
 
+They can also be used as input to `firety skill attest` when a maintainer wants to publish a support statement from already-saved evidence instead of rerunning analysis.
+
 ## Command
 
 Build a pack from fresh analysis:

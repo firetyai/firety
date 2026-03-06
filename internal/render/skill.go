@@ -9,6 +9,7 @@ import (
 	"github.com/firety/firety/internal/artifact"
 	"github.com/firety/firety/internal/benchmark"
 	"github.com/firety/firety/internal/domain/analysis"
+	"github.com/firety/firety/internal/domain/attestation"
 	domaineval "github.com/firety/firety/internal/domain/eval"
 	"github.com/firety/firety/internal/domain/gate"
 )
@@ -46,6 +47,12 @@ func RenderArtifact(path string, mode Mode) (string, error) {
 	}
 
 	switch envelope.ArtifactType {
+	case "firety.skill-attestation":
+		var value artifact.SkillAttestationArtifact
+		if err := json.Unmarshal(data, &value); err != nil {
+			return "", err
+		}
+		return renderAttestationArtifact(path, value, mode), nil
 	case "firety.skill-compatibility":
 		var value artifact.SkillCompatibilityArtifact
 		if err := json.Unmarshal(data, &value); err != nil {
@@ -127,6 +134,50 @@ func RenderArtifact(path string, mode Mode) (string, error) {
 	default:
 		return "", fmt.Errorf("unsupported artifact type %q", envelope.ArtifactType)
 	}
+}
+
+func renderAttestationArtifact(path string, value artifact.SkillAttestationArtifact, mode Mode) string {
+	var b strings.Builder
+	writeTitle(&b, mode, "Firety Skill Attestation")
+	writeLine(&b, fmt.Sprintf("Support posture: %s", string(value.Attestation.SupportPosture)))
+	writeLine(&b, fmt.Sprintf("Evidence: %s", string(value.Attestation.EvidenceLevel)))
+	writeLine(&b, fmt.Sprintf("Summary: %s", value.Attestation.Summary))
+	if value.Attestation.QualityGate != nil {
+		writeLine(&b, fmt.Sprintf("Quality gate: %s", strings.ToUpper(value.Attestation.QualityGate.Decision)))
+	}
+	if len(value.Attestation.Claims) > 0 {
+		writeSectionHeader(&b, mode, "Claims")
+		for _, item := range firstClaimStatements(value.Attestation.Claims, 3) {
+			writeBullet(&b, item)
+		}
+	}
+	if len(value.Attestation.Limitations) > 0 && mode != ModePRComment {
+		writeSectionHeader(&b, mode, "Known limitations")
+		for _, item := range firstStrings(value.Attestation.Limitations, 3) {
+			writeBullet(&b, item)
+		}
+	}
+	if mode == ModeFullReport {
+		if len(value.Attestation.RecommendedConsumerReadingOrder) > 0 {
+			writeSectionHeader(&b, mode, "Read next")
+			for _, item := range value.Attestation.RecommendedConsumerReadingOrder {
+				writeBullet(&b, item)
+			}
+		}
+		writeLine(&b, fmt.Sprintf("Artifact: %s", path))
+	}
+	return strings.TrimSpace(b.String()) + "\n"
+}
+
+func firstClaimStatements(claims []attestation.Claim, limit int) []string {
+	values := make([]string, 0, min(len(claims), limit))
+	for _, claim := range claims {
+		values = append(values, claim.Statement)
+		if len(values) == limit {
+			break
+		}
+	}
+	return values
 }
 
 func renderCompatibilityArtifact(path string, value artifact.SkillCompatibilityArtifact, mode Mode) string {

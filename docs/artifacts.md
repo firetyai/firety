@@ -11,6 +11,7 @@ Inspect an artifact:
 ```bash
 firety artifact inspect ./lint-artifact.json
 firety artifact inspect ./eval-artifact.json --format json
+firety artifact inspect ./attestation.json
 ```
 
 Render an artifact into an existing report style:
@@ -18,6 +19,7 @@ Render an artifact into an existing report style:
 ```bash
 firety artifact render ./analysis-artifact.json --render pr-comment
 firety artifact render ./gate-artifact.json --render ci-summary
+firety artifact render ./attestation.json --render full-report
 firety artifact render ./benchmark-artifact.json --render full-report
 ```
 
@@ -55,6 +57,7 @@ The first version supports artifact-driven rendering for Firety artifact types t
 - baseline snapshot
 - baseline compare
 - compatibility
+- attestation
 - benchmark report
 
 Artifact rendering reuses Firety's existing presentation layer. It does not rerun lint, eval, compare, or gate logic.

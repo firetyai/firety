@@ -94,7 +94,7 @@ func TestSkillCommandHelp(t *testing.T) {
 		t.Fatalf("expected empty stderr, got %q", stderr)
 	}
 
-	for _, expected := range []string{"lint", "baseline", "compatibility", "plan", "analyze", "eval", "eval-compare", "gate", "compare", "render", "rules"} {
+	for _, expected := range []string{"lint", "attest", "baseline", "compatibility", "plan", "analyze", "eval", "eval-compare", "gate", "compare", "render", "rules"} {
 		if !strings.Contains(stdout, expected) {
 			t.Fatalf("expected help output to contain %q, got %q", expected, stdout)
 		}

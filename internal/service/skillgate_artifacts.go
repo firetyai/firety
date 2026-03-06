@@ -2,6 +2,7 @@ package service
 
 import (
 	domaineval "github.com/firety/firety/internal/domain/eval"
+	domaingate "github.com/firety/firety/internal/domain/gate"
 	"github.com/firety/firety/internal/domain/lint"
 )
 
@@ -84,8 +85,9 @@ type gateSkillLintCompareChanged struct {
 
 type gateSkillEvalArtifact struct {
 	Run struct {
-		Target string `json:"target"`
-		Runner string `json:"runner,omitempty"`
+		Target  string `json:"target"`
+		Profile string `json:"profile,omitempty"`
+		Runner  string `json:"runner,omitempty"`
 	} `json:"run"`
 	Suite   domaineval.RoutingEvalSuiteInfo    `json:"suite"`
 	Backend domaineval.RoutingEvalBackendInfo  `json:"backend"`
@@ -155,4 +157,11 @@ type gateSkillBaselineCompareArtifact struct {
 		EvalComparison         *domaineval.RoutingEvalComparison      `json:"eval_comparison,omitempty"`
 		MultiBackendComparison *domaineval.MultiBackendEvalComparison `json:"multi_backend_comparison,omitempty"`
 	} `json:"comparison"`
+}
+
+type gateSkillGateArtifact struct {
+	Run struct {
+		Target string `json:"target"`
+	} `json:"run"`
+	Result domaingate.Result `json:"result"`
 }

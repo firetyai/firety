@@ -162,6 +162,12 @@ func load(path string) (loadedArtifact, error) {
 	}
 
 	switch header.ArtifactType {
+	case "firety.skill-attestation":
+		var value artifact.SkillAttestationArtifact
+		if err := json.Unmarshal(data, &value); err != nil {
+			return loadedArtifact{}, err
+		}
+		return loadedArtifact{Path: path, Value: value, Inspect: inspectSkillAttestation(path, value)}, nil
 	case "firety.skill-lint":
 		var value artifact.SkillLintArtifact
 		if err := json.Unmarshal(data, &value); err != nil {
@@ -242,6 +248,19 @@ func load(path string) (loadedArtifact, error) {
 		return loadedArtifact{Path: path, Value: value, Inspect: inspectBenchmark(path, value)}, nil
 	default:
 		return loadedArtifact{}, fmt.Errorf("unsupported artifact type %q", header.ArtifactType)
+	}
+}
+
+func inspectSkillAttestation(path string, value artifact.SkillAttestationArtifact) Inspection {
+	return Inspection{
+		Path:                 path,
+		ArtifactType:         value.ArtifactType,
+		SchemaVersion:        value.SchemaVersion,
+		Origin:               "firety skill attest",
+		Target:               firstNonEmpty(value.Run.Target, value.Attestation.Target),
+		Summary:              value.Attestation.Summary,
+		Context:              nonEmptyStrings(fmt.Sprintf("support posture %s", value.Attestation.SupportPosture), fmt.Sprintf("evidence %s", value.Attestation.EvidenceLevel)),
+		SupportedRenderModes: renderModes(),
 	}
 }
 

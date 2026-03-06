@@ -51,6 +51,7 @@ func newSkillCommand(application *app.App) *cobra.Command {
 	}
 
 	cmd.AddCommand(newSkillLintCommand(application))
+	cmd.AddCommand(newSkillAttestCommand(application))
 	cmd.AddCommand(newSkillBaselineCommand(application))
 	cmd.AddCommand(newSkillCompatibilityCommand(application))
 	cmd.AddCommand(newSkillPlanCommand(application))

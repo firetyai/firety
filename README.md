@@ -16,6 +16,7 @@ The goal of this foundation is to make future growth predictable without turning
 ```text
 firety artifact
 firety skill lint [path]
+firety skill attest [path]
 firety skill baseline
 firety skill compatibility [path]
 firety skill plan [path]
@@ -59,6 +60,8 @@ firety skill baseline save ./path/to/skill --output ./baseline.json
 firety skill baseline compare ./path/to/skill --baseline ./baseline.json
 firety skill compatibility ./path/to/skill
 firety skill compatibility ./path/to/skill --backend codex=./codex-runner --backend cursor=./cursor-runner
+firety skill attest ./path/to/skill --runner ./routing-runner --include-gate
+firety skill attest --input-artifact ./compatibility.json --input-artifact ./gate.json
 firety skill eval ./path/to/skill --runner ./routing-runner
 firety skill eval ./path/to/skill --format json --artifact ./eval-artifact.json
 firety skill eval ./path/to/skill --backend codex=./codex-runner --backend claude-code=./claude-runner
@@ -130,7 +133,9 @@ firety skill render ./analysis-artifact.json --render pr-comment
 firety skill render ./compare-artifact.json --render ci-summary
 firety skill render ./gate-artifact.json --render ci-summary
 firety skill render ./plan-artifact.json --render full-report
+firety skill render ./attestation-artifact.json --render full-report
 firety artifact inspect ./analysis-artifact.json
+firety artifact inspect ./attestation-artifact.json
 firety artifact render ./analysis-artifact.json --render pr-comment
 firety artifact compare ./before-lint.json ./after-lint.json
 firety evidence pack ./path/to/skill --output ./evidence-pack
@@ -169,6 +174,7 @@ The rule catalog is also a first-class product surface:
 - `firety skill rules --format json` exports the same catalog in a stable machine-readable form
 - `firety skill baseline` manages explicit saved baseline snapshots for long-lived regression workflows
 - `firety skill compatibility` summarizes support posture, portability, and backend health from Firety's existing evidence
+- `firety skill attest` turns Firety evidence into a publishable support-claims manifest with explicit tested-vs-supported distinctions
 - `firety skill gate` turns selected Firety evidence into a deterministic PASS/FAIL policy decision
 - `firety skill render <artifact> --render pr-comment|ci-summary|full-report` turns existing artifacts into reviewer-friendly summaries without rerunning analysis
 - `firety artifact inspect <artifact>` validates a saved artifact and explains what it represents
@@ -179,6 +185,7 @@ The rule catalog is also a first-class product surface:
 - `firety benchmark render <artifact> --render pr-comment|ci-summary|full-report` renders saved benchmark artifacts without rerunning the corpus
 - artifact-first workflows are documented in [docs/artifacts.md](docs/artifacts.md)
 - evidence-pack workflows are documented in [docs/evidence-packs.md](docs/evidence-packs.md)
+- attestation workflows are documented in [docs/attestation.md](docs/attestation.md)
 - dedicated rule documentation lives in [docs/lint-rules.md](docs/lint-rules.md)
 - the versioned lint artifact format is documented in [docs/lint-artifact.md](docs/lint-artifact.md)
 - routing eval behavior and the local suite/runner format are documented in [docs/skill-eval.md](docs/skill-eval.md)
@@ -268,6 +275,14 @@ Compatibility:
 - the compatibility view is built from existing lint portability signals, routing-risk summaries, and optional measured backend results
 - use `--backend` to add measured backend evidence to the compatibility matrix
 - use `--input-artifact` to compute compatibility from existing Firety artifacts without rerunning analysis
+
+Attestation and support claims:
+
+- `firety skill attest [path]` produces a human-readable support statement and a machine-readable attestation manifest
+- attestation keeps tested profiles/backends separate from supported profiles/backends
+- use `--input-artifact` or `--input-pack` to synthesize the statement from saved Firety evidence without rerunning analysis
+- use `--include-gate` to include an explicit quality-gate summary in fresh attestation generation
+- Firety keeps attestation claims conservative; if evidence is weak, partial, or mixed, the manifest says so explicitly
 - Firety keeps support-posture claims conservative; if evidence is incomplete or conflicting, the output says so
 
 Strictness philosophy:

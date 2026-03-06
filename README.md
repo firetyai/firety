@@ -33,6 +33,7 @@ firety skill rules
 firety benchmark run
 firety benchmark render <artifact>
 firety evidence pack [path]
+firety publish report [path]
 firety mcp
 firety agent
 firety version
@@ -140,6 +141,8 @@ firety artifact render ./analysis-artifact.json --render pr-comment
 firety artifact compare ./before-lint.json ./after-lint.json
 firety evidence pack ./path/to/skill --output ./evidence-pack
 firety evidence pack --input-artifact ./analysis-artifact.json --output ./evidence-pack
+firety publish report ./path/to/skill --output ./trust-report --runner ./routing-runner --include-gate
+firety publish report --input-pack ./evidence-pack --output ./trust-report
 firety benchmark run
 firety benchmark run --format json --artifact ./benchmark-artifact.json
 firety benchmark render ./benchmark-artifact.json --render ci-summary
@@ -181,11 +184,13 @@ The rule catalog is also a first-class product surface:
 - `firety artifact render <artifact> --render pr-comment|ci-summary|full-report` renders a saved artifact without using the original live command path
 - `firety artifact compare <base-artifact> <candidate-artifact>` compares compatible saved artifacts without rerunning analysis
 - `firety evidence pack [path] --output <dir>` packages Firety artifacts and rendered summaries into a deterministic review bundle
+- `firety publish report [path] --output <dir>` turns Firety evidence into a static publishable trust-report bundle
 - `firety benchmark run` turns Firety's built-in benchmark corpus into a structured maintainer/public quality summary
 - `firety benchmark render <artifact> --render pr-comment|ci-summary|full-report` renders saved benchmark artifacts without rerunning the corpus
 - artifact-first workflows are documented in [docs/artifacts.md](docs/artifacts.md)
 - evidence-pack workflows are documented in [docs/evidence-packs.md](docs/evidence-packs.md)
 - attestation workflows are documented in [docs/attestation.md](docs/attestation.md)
+- trust-report workflows are documented in [docs/trust-report.md](docs/trust-report.md)
 - dedicated rule documentation lives in [docs/lint-rules.md](docs/lint-rules.md)
 - the versioned lint artifact format is documented in [docs/lint-artifact.md](docs/lint-artifact.md)
 - routing eval behavior and the local suite/runner format are documented in [docs/skill-eval.md](docs/skill-eval.md)
@@ -239,6 +244,14 @@ Evidence packs:
 - `--input-artifact <path>` lets Firety assemble a pack from existing saved artifacts without rerunning analysis
 - fresh packs always include lint evidence and can also include eval, plan, compatibility, and gate evidence when explicitly requested
 - the first version is directory-first and intentionally avoids a more complex archive or publishing system
+
+Static trust reports:
+
+- `firety publish report [path] --output <dir>` builds a deterministic static HTML trust-report bundle for offline review, release attachments, or static hosting
+- trust reports are built on top of evidence packs, saved artifacts, and support attestations rather than reimplementing analysis logic
+- the bundle uses `index.html` as the reviewer entrypoint and includes rendered pages, copied evidence, and a machine-readable manifest
+- `--input-artifact <path>` and `--input-pack <dir>` allow offline publishing without rerunning analysis
+- the first version is intentionally small and static: plain HTML, no frontend framework, no hosted backend, and no hidden analysis
 
 Benchmark reporting:
 

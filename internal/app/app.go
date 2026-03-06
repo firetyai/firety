@@ -19,6 +19,7 @@ type Services struct {
 	SkillCompatibility service.SkillCompatibilityService
 	SkillPlan          service.SkillPlanService
 	SkillGate          service.SkillGateService
+	SkillReadiness     service.SkillReadinessService
 	SkillBaseline      service.SkillBaselineService
 	SkillAttest        service.SkillAttestService
 	Benchmark          service.BenchmarkService
@@ -36,6 +37,8 @@ func New(version VersionInfo) *App {
 	skillEvalCompare := service.NewSkillEvalCompareService(skillEval)
 	skillCompatibility := service.NewSkillCompatibilityService(skillLint, skillEval)
 	skillGate := service.NewSkillGateService(skillLint, skillCompare, skillEval, skillEvalCompare)
+	skillAttest := service.NewSkillAttestService(skillCompatibility, skillGate, skillEval)
+	skillReadiness := service.NewSkillReadinessService(skillCompatibility, skillGate, skillAttest)
 
 	return &App{
 		Version: version,
@@ -50,8 +53,9 @@ func New(version VersionInfo) *App {
 			SkillCompatibility: skillCompatibility,
 			SkillPlan:          service.NewSkillPlanService(skillLint, skillEval),
 			SkillGate:          skillGate,
+			SkillReadiness:     skillReadiness,
 			SkillBaseline:      service.NewSkillBaselineService(skillLint, skillEval),
-			SkillAttest:        service.NewSkillAttestService(skillCompatibility, skillGate, skillEval),
+			SkillAttest:        skillAttest,
 			Benchmark:          service.NewBenchmarkService(skillLint),
 		},
 	}

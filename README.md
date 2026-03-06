@@ -34,6 +34,7 @@ firety benchmark run
 firety benchmark render <artifact>
 firety evidence pack [path]
 firety publish report [path]
+firety readiness check [path]
 firety mcp
 firety agent
 firety version
@@ -149,6 +150,8 @@ firety evidence pack ./path/to/skill --output ./evidence-pack
 firety evidence pack --input-artifact ./analysis-artifact.json --output ./evidence-pack
 firety publish report ./path/to/skill --output ./trust-report --runner ./routing-runner --include-gate
 firety publish report --input-pack ./evidence-pack --output ./trust-report
+firety readiness check ./path/to/skill --context merge --runner ./routing-runner
+firety readiness check --context public-attestation --input-pack ./evidence-pack
 firety benchmark run
 firety benchmark run --format json --artifact ./benchmark-artifact.json
 firety benchmark render ./benchmark-artifact.json --render ci-summary
@@ -185,6 +188,7 @@ The rule catalog is also a first-class product surface:
 - `firety skill compatibility` summarizes support posture, portability, and backend health from Firety's existing evidence
 - `firety skill attest` turns Firety evidence into a publishable support-claims manifest with explicit tested-vs-supported distinctions
 - `firety skill gate` turns selected Firety evidence into a deterministic PASS/FAIL policy decision
+- `firety readiness check` turns Firety quality, freshness, support-posture, and attestation evidence into a publish decision for a specific context
 - `firety skill render <artifact> --render pr-comment|ci-summary|full-report` turns existing artifacts into reviewer-friendly summaries without rerunning analysis
 - `firety artifact inspect <artifact>` validates a saved artifact and explains what it represents
 - `firety freshness inspect <artifact-or-pack-or-report>` tells you whether saved evidence is still current enough to trust and what should be recertified
@@ -199,6 +203,7 @@ The rule catalog is also a first-class product surface:
 - artifact-first workflows are documented in [docs/artifacts.md](docs/artifacts.md)
 - evidence freshness and recertification workflows are documented in [docs/freshness.md](docs/freshness.md)
 - provenance and reproducibility workflows are documented in [docs/provenance.md](docs/provenance.md)
+- readiness and publish-decision workflows are documented in [docs/readiness.md](docs/readiness.md)
 - evidence-pack workflows are documented in [docs/evidence-packs.md](docs/evidence-packs.md)
 - attestation workflows are documented in [docs/attestation.md](docs/attestation.md)
 - trust-report workflows are documented in [docs/trust-report.md](docs/trust-report.md)
@@ -263,6 +268,13 @@ Evidence freshness and recertification:
 - freshness is based on saved file timestamps plus the supporting provenance and dependency relationships Firety can actually see
 - Firety keeps intended use explicit: compare, baseline, publish, release-claim, and debug suitability are reported separately when useful
 - recertification advice is intentionally short and operational, such as rerun lint, rerun eval, rebuild a pack, or regenerate an attestation
+
+Release readiness and publish decisions:
+
+- `firety readiness check [path]` evaluates whether a skill is ready for `internal`, `merge`, `release-candidate`, `public-release`, `public-attestation`, or `public-trust-report`
+- readiness reuses Firety's existing gate, freshness, compatibility, and attestation evidence rather than inventing a new policy engine
+- output is intentionally conservative and separates hard blockers, caveats, and non-blocking improvement opportunities
+- `ready` does not mean guaranteed success, and `not-ready` does not mean unreleasable in every context; the decision is always tied to the selected publish context
 
 Evidence packs:
 

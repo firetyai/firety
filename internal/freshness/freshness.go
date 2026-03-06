@@ -305,6 +305,14 @@ func artifactDependencies(info provenance.Inspection, baseDir string) ([]depende
 			return nil, nil, err
 		}
 		refs = append(refs, externalRefs(baseDir, value.Run.InputArtifacts, provenance.ObjectKindArtifact)...)
+	case "firety.skill-readiness":
+		var value artifact.SkillReadinessArtifact
+		if err := json.Unmarshal(data, &value); err != nil {
+			return nil, nil, err
+		}
+		refs = append(refs, externalRefs(baseDir, value.Run.InputArtifacts, provenance.ObjectKindArtifact)...)
+		refs = append(refs, externalRefs(baseDir, value.Run.InputPacks, provenance.ObjectKindEvidencePack)...)
+		refs = append(refs, externalRefs(baseDir, value.Run.InputReports, provenance.ObjectKindTrustReport)...)
 	case "firety.skill-baseline-compare":
 		var value artifact.SkillBaselineCompareArtifact
 		if err := json.Unmarshal(data, &value); err != nil {

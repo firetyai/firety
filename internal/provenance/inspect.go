@@ -331,6 +331,23 @@ func artifactProvenance(artifactType string, data []byte) (Record, string, bool,
 		record.InputArtifacts = append([]string(nil), value.Run.InputArtifacts...)
 		record.ComparableKey = "artifact:" + artifactType
 		return record, value.Report.Summary, true, false, nil
+	case "firety.skill-readiness":
+		var value artifact.SkillReadinessArtifact
+		if err := json.Unmarshal(data, &value); err != nil {
+			return Record{}, "", false, false, err
+		}
+		record := NewRecord()
+		record.CommandOrigin = "firety readiness check"
+		record.Target = firstNonEmpty(value.Readiness.Target, value.Run.Target)
+		record.Strictness = value.Run.Strictness
+		record.SuitePath = value.Run.SuitePath
+		record.Backends = append([]string(nil), value.Run.Backends...)
+		record.InputArtifacts = append([]string(nil), value.Run.InputArtifacts...)
+		record.InputPacks = append([]string(nil), value.Run.InputPacks...)
+		record.ArtifactDependencies = append([]string(nil), value.Run.InputReports...)
+		record.ComparabilityNotes = append(record.ComparabilityNotes, "readiness artifacts are summary decisions and should not be compared directly for regression analysis")
+		record.ReproducibilityNotes = append(record.ReproducibilityNotes, "publish context "+value.Run.PublishContext)
+		return record, value.Readiness.Summary, false, false, nil
 	case "firety.benchmark-report":
 		var value artifact.BenchmarkArtifact
 		if err := json.Unmarshal(data, &value); err != nil {

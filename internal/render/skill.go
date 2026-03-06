@@ -59,6 +59,12 @@ func RenderArtifact(path string, mode Mode) (string, error) {
 			return "", err
 		}
 		return renderCompatibilityArtifact(path, value, mode), nil
+	case "firety.skill-readiness":
+		var value artifact.SkillReadinessArtifact
+		if err := json.Unmarshal(data, &value); err != nil {
+			return "", err
+		}
+		return renderReadinessArtifact(path, value, mode), nil
 	case "firety.skill-baseline":
 		var value artifact.SkillBaselineSnapshotArtifact
 		if err := json.Unmarshal(data, &value); err != nil {
@@ -215,6 +221,39 @@ func renderCompatibilityArtifact(path string, value artifact.SkillCompatibilityA
 			writeSectionHeader(&b, mode, "Positioning")
 			writeBullet(&b, value.Report.RecommendedPositioning)
 		}
+		writeLine(&b, fmt.Sprintf("Artifact: %s", path))
+	}
+	return strings.TrimSpace(b.String()) + "\n"
+}
+
+func renderReadinessArtifact(path string, value artifact.SkillReadinessArtifact, mode Mode) string {
+	var b strings.Builder
+	writeTitle(&b, mode, "Firety Readiness")
+	writeLine(&b, fmt.Sprintf("Decision: %s", strings.ToUpper(string(value.Readiness.Decision))))
+	writeLine(&b, fmt.Sprintf("Context: %s", value.Readiness.PublishContext))
+	writeLine(&b, fmt.Sprintf("Summary: %s", value.Readiness.Summary))
+	if len(value.Readiness.Blockers) > 0 {
+		writeSectionHeader(&b, mode, "Review first")
+		for _, item := range value.Readiness.Blockers[:min(len(value.Readiness.Blockers), 3)] {
+			writeBullet(&b, item.Summary)
+		}
+	}
+	if mode != ModePRComment && len(value.Readiness.Caveats) > 0 {
+		writeSectionHeader(&b, mode, "Caveats")
+		for _, item := range value.Readiness.Caveats[:min(len(value.Readiness.Caveats), 3)] {
+			writeBullet(&b, item.Summary)
+		}
+	}
+	if mode == ModeFullReport {
+		if len(value.Readiness.RecommendedActions) > 0 {
+			writeSectionHeader(&b, mode, "Next actions")
+			for _, item := range value.Readiness.RecommendedActions {
+				writeBullet(&b, item)
+			}
+		}
+		writeSectionHeader(&b, mode, "Publish surfaces")
+		writeBullet(&b, fmt.Sprintf("Attestation: %s", value.Readiness.AttestationSuitability.Summary))
+		writeBullet(&b, fmt.Sprintf("Trust report: %s", value.Readiness.TrustReportSuitability.Summary))
 		writeLine(&b, fmt.Sprintf("Artifact: %s", path))
 	}
 	return strings.TrimSpace(b.String()) + "\n"

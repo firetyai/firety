@@ -240,6 +240,12 @@ func load(path string) (loadedArtifact, error) {
 			return loadedArtifact{}, err
 		}
 		return loadedArtifact{Path: path, Value: value, Inspect: inspectSkillCompatibility(path, value)}, nil
+	case "firety.skill-readiness":
+		var value artifact.SkillReadinessArtifact
+		if err := json.Unmarshal(data, &value); err != nil {
+			return loadedArtifact{}, err
+		}
+		return loadedArtifact{Path: path, Value: value, Inspect: inspectSkillReadiness(path, value)}, nil
 	case "firety.benchmark-report":
 		var value artifact.BenchmarkArtifact
 		if err := json.Unmarshal(data, &value); err != nil {
@@ -422,6 +428,19 @@ func inspectSkillCompatibility(path string, value artifact.SkillCompatibilityArt
 		Target:               firstNonEmpty(value.Run.Target, value.Report.Target),
 		Summary:              value.Report.Summary,
 		Context:              nonEmptyStrings(fmt.Sprintf("support posture %s", value.Report.SupportPosture), fmt.Sprintf("evidence %s", value.Report.EvidenceLevel)),
+		SupportedRenderModes: renderModes(),
+	}
+}
+
+func inspectSkillReadiness(path string, value artifact.SkillReadinessArtifact) Inspection {
+	return Inspection{
+		Path:                 path,
+		ArtifactType:         value.ArtifactType,
+		SchemaVersion:        value.SchemaVersion,
+		Origin:               "firety readiness check",
+		Target:               firstNonEmpty(value.Run.Target, value.Readiness.Target),
+		Summary:              value.Readiness.Summary,
+		Context:              nonEmptyStrings(fmt.Sprintf("context %s", value.Readiness.PublishContext), fmt.Sprintf("decision %s", value.Readiness.Decision)),
 		SupportedRenderModes: renderModes(),
 	}
 }

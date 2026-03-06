@@ -167,6 +167,42 @@ func TestArtifactInspectCommandForAttestationArtifact(t *testing.T) {
 	}
 }
 
+func TestArtifactInspectAndRenderForReadinessArtifact(t *testing.T) {
+	t.Parallel()
+
+	root := t.TempDir()
+	runner := writeRoutingEvalRunner(t, "good")
+	artifactPath := filepath.Join(t.TempDir(), "readiness.json")
+	testutil.WriteFiles(t, root, testutil.RoutingEvalSkillFiles())
+
+	_, _, _, _ = executeReadinessCheck(t, root, "--context", "merge", "--runner", runner, "--artifact", artifactPath, "--format", "json")
+
+	stdout, stderr, code, err := executeArtifact(t, "inspect", artifactPath)
+	if err != nil {
+		t.Fatalf("expected no runtime error, got %v", err)
+	}
+	if code != cli.ExitCodeOK {
+		t.Fatalf("expected exit code %d, got %d", cli.ExitCodeOK, code)
+	}
+	if stderr != "" {
+		t.Fatalf("expected empty stderr, got %q", stderr)
+	}
+	if !strings.Contains(stdout, "Type: firety.skill-readiness") {
+		t.Fatalf("expected readiness artifact type, got %q", stdout)
+	}
+
+	rendered, stderr, code, err := executeArtifact(t, "render", artifactPath, "--render", "ci-summary")
+	if err != nil {
+		t.Fatalf("expected no runtime error, got %v", err)
+	}
+	if code != cli.ExitCodeOK || stderr != "" {
+		t.Fatalf("expected successful render, got code=%d stderr=%q err=%v", code, stderr, err)
+	}
+	if !strings.Contains(rendered, "Firety Readiness") {
+		t.Fatalf("expected readiness render output, got %q", rendered)
+	}
+}
+
 func TestArtifactCompareCommandForLintArtifacts(t *testing.T) {
 	t.Parallel()
 

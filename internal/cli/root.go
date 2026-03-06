@@ -29,6 +29,7 @@ func NewRootCommand(application *app.App, stdout, stderr io.Writer) *cobra.Comma
 		newFreshnessCommand(),
 		newPublishCommand(application),
 		newProvenanceCommand(),
+		newReadinessCommand(application),
 		newSkillCommand(application),
 		newMCPCommand(application),
 		newAgentCommand(application),

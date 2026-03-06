@@ -3,6 +3,7 @@
 Firety artifacts are first-class saved outputs. They are meant to support offline review, CI summaries, PR comments, debugging, and later hosted/reporting flows without rerunning analysis.
 
 For a higher-level shareable bundle built from those artifacts, see [docs/evidence-packs.md](evidence-packs.md).
+For reproducibility and comparability checks across artifacts, packs, and trust reports, see [docs/provenance.md](provenance.md).
 
 ## Commands
 
@@ -29,6 +30,15 @@ Compare two compatible artifacts:
 firety artifact compare ./baseline-lint.json ./candidate-lint.json
 firety artifact compare ./base-eval.json ./candidate-eval.json --format json
 firety artifact compare ./base-multi.json ./candidate-multi.json
+```
+
+Inspect provenance or comparability without rerunning analysis:
+
+```bash
+firety provenance inspect ./lint-artifact.json
+firety provenance inspect ./evidence-pack
+firety provenance inspect ./trust-report
+firety provenance compare ./before-eval.json ./after-eval.json
 ```
 
 ## What inspection shows

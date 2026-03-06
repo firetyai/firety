@@ -33,6 +33,8 @@ The first version writes a deterministic directory with:
 - `evidence-packs/` when existing packs are copied in directly
 - `artifacts/` for any derived report-local artifacts, such as a synthesized attestation
 
+`manifest.json` includes the report's focused provenance so Firety can later explain how the report was built, whether it came from fresh analysis or existing evidence, and whether it is meaningfully comparable to another saved report.
+
 `index.html` is the primary entrypoint. It summarizes:
 
 - support posture
@@ -83,3 +85,9 @@ The first version intentionally does not include:
 - archive formats
 - hosted publishing or syncing
 - repo-wide multi-skill report sites
+
+For provenance inspection on a saved trust report, use:
+
+```bash
+firety provenance inspect ./trust-report
+```

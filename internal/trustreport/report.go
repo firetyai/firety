@@ -17,6 +17,7 @@ import (
 	"github.com/firety/firety/internal/domain/compatibility"
 	"github.com/firety/firety/internal/domain/lint"
 	"github.com/firety/firety/internal/evidencepack"
+	"github.com/firety/firety/internal/provenance"
 	"github.com/firety/firety/internal/render"
 	"github.com/firety/firety/internal/service"
 )
@@ -69,6 +70,7 @@ type Manifest struct {
 	CautionAreas           []string          `json:"caution_areas,omitempty"`
 	RecommendedEntrypoints []string          `json:"recommended_entrypoints,omitempty"`
 	Context                BuildContext      `json:"context"`
+	Provenance             provenance.Record `json:"provenance"`
 	EvidencePacks          []EvidencePackRef `json:"evidence_packs,omitempty"`
 	Artifacts              []ArtifactRef     `json:"artifacts,omitempty"`
 	Pages                  []PageRef         `json:"pages,omitempty"`
@@ -221,7 +223,10 @@ func (b Builder) Build(target string, options BuildOptions) (Result, error) {
 		return Result{}, err
 	}
 
-	manifest := buildManifest(b.application, options, packs, allArtifacts, pages, known)
+	manifest, err := buildManifest(b.application, options, packs, allArtifacts, pages, known)
+	if err != nil {
+		return Result{}, err
+	}
 	if err := writeManifest(filepath.Join(root, "manifest.json"), manifest); err != nil {
 		return Result{}, err
 	}
@@ -551,7 +556,7 @@ func buildPages(root string, artifacts []bundleArtifact) ([]PageRef, error) {
 	return pages, nil
 }
 
-func buildManifest(application *app.App, options BuildOptions, packs []packBundle, artifacts []bundleArtifact, pages []PageRef, known knownArtifacts) Manifest {
+func buildManifest(application *app.App, options BuildOptions, packs []packBundle, artifacts []bundleArtifact, pages []PageRef, known knownArtifacts) (Manifest, error) {
 	evidencePacks := make([]EvidencePackRef, 0, len(packs))
 	for _, pack := range packs {
 		evidencePacks = append(evidencePacks, EvidencePackRef{
@@ -589,6 +594,7 @@ func buildManifest(application *app.App, options BuildOptions, packs []packBundl
 		Target:        firstNonEmpty(attestationTarget(known.attestation), compatibilityTarget(known.compatibility), primaryTarget(artifacts)),
 		Summary:       manifestSummary(known, packs, artifacts),
 		Context:       buildContext(options),
+		Provenance:    buildTrustReportProvenance(application, options, packs, artifactRefs, known),
 		EvidencePacks: evidencePacks,
 		Artifacts:     artifactRefs,
 		Pages:         pages,
@@ -618,7 +624,7 @@ func buildManifest(application *app.App, options BuildOptions, packs []packBundl
 	}
 
 	manifest.RecommendedEntrypoints = recommendedEntrypoints(manifest, pages, packs)
-	return manifest
+	return manifest, nil
 }
 
 func buildContext(options BuildOptions) BuildContext {
@@ -637,6 +643,44 @@ func buildContext(options BuildOptions) BuildContext {
 	}
 }
 
+func buildTrustReportProvenance(application *app.App, options BuildOptions, packs []packBundle, artifacts []ArtifactRef, known knownArtifacts) provenance.Record {
+	record := provenance.NewRecord()
+	record.CommandOrigin = "firety publish report"
+	record.FiretyVersion = application.Version.Version
+	record.FiretyCommit = application.Version.Commit
+	record.Target = firstNonEmpty(attestationTarget(known.attestation), compatibilityTarget(known.compatibility), firstArtifactTarget(artifacts))
+	record.Profile = string(options.Profile)
+	record.Strictness = options.Strictness.DisplayName()
+	record.FailOn = options.FailOn
+	record.Explain = options.Explain
+	record.RoutingRisk = options.RoutingRisk
+	record.SuitePath = strings.TrimSpace(options.SuitePath)
+	record.Backends = backendSelectionIDs(options.BackendSelections)
+	record.InputArtifacts = append([]string(nil), options.InputArtifacts...)
+	record.InputPacks = append([]string(nil), options.InputPacks...)
+	record.ArtifactDependencies = artifactRefPaths(artifacts)
+	record.ComparableKey = trustReportComparableKey(options, packs)
+
+	if len(options.InputPacks) == 0 && len(options.InputArtifacts) == 0 && strings.TrimSpace(record.Target) != "" {
+		fingerprint, err := provenance.FingerprintDirectory(record.Target)
+		if err == nil {
+			record.TargetFingerprint = fingerprint
+		} else {
+			record.ReproducibilityNotes = append(record.ReproducibilityNotes, fmt.Sprintf("target fingerprint could not be computed: %v", err))
+		}
+	} else {
+		record.ReproducibilityNotes = append(record.ReproducibilityNotes, "trust report was assembled from existing packs or artifacts")
+	}
+	if len(options.InputPacks) > 0 {
+		record.ReproducibilityNotes = append(record.ReproducibilityNotes, "report content depends on supplied evidence packs")
+	}
+	if record.SuitePath == "" && len(record.Backends) > 0 {
+		record.ComparabilityNotes = append(record.ComparabilityNotes, "backend evidence is present without an explicit suite path")
+	}
+
+	return provenance.NormalizeRecord(record)
+}
+
 func manifestSource(options BuildOptions, packs []packBundle) string {
 	switch {
 	case len(options.InputPacks) > 0:
@@ -648,6 +692,22 @@ func manifestSource(options BuildOptions, packs []packBundle) string {
 	default:
 		return "unknown"
 	}
+}
+
+func trustReportComparableKey(options BuildOptions, packs []packBundle) string {
+	source := manifestSource(options, packs)
+	parts := []string{
+		"source:" + firstNonEmpty(source, "unknown"),
+		"profile:" + string(options.Profile),
+		"strictness:" + options.Strictness.DisplayName(),
+		"fail-on:" + options.FailOn,
+		"suite:" + strings.TrimSpace(options.SuitePath),
+	}
+	backends := backendSelectionIDs(options.BackendSelections)
+	if len(backends) > 0 {
+		parts = append(parts, "backends:"+strings.Join(backends, ","))
+	}
+	return strings.Join(parts, "|")
 }
 
 func manifestSummary(known knownArtifacts, packs []packBundle, artifacts []bundleArtifact) string {
@@ -893,6 +953,14 @@ func backendSelectionLabels(values []service.SkillEvalBackendSelection) []string
 	return out
 }
 
+func backendSelectionIDs(values []service.SkillEvalBackendSelection) []string {
+	out := make([]string, 0, len(values))
+	for _, value := range values {
+		out = append(out, value.ID)
+	}
+	return uniqueStrings(out)
+}
+
 func attestationTarget(value *artifact.SkillAttestationArtifact) string {
 	if value == nil {
 		return ""
@@ -914,6 +982,23 @@ func primaryTarget(values []bundleArtifact) string {
 		}
 	}
 	return ""
+}
+
+func firstArtifactTarget(values []ArtifactRef) string {
+	for _, value := range values {
+		if target := firstNonEmpty(value.CandidateTarget, value.Target); target != "" {
+			return target
+		}
+	}
+	return ""
+}
+
+func artifactRefPaths(values []ArtifactRef) []string {
+	out := make([]string, 0, len(values))
+	for _, value := range values {
+		out = append(out, value.Path)
+	}
+	return uniqueStrings(out)
 }
 
 func firstClaimStatements(values []attestation.Claim, limit int) []string {

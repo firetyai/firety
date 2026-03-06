@@ -29,7 +29,7 @@ The first version writes a deterministic directory with:
 - `artifacts/`
 - `reports/`
 
-`manifest.json` records what the pack contains, what Firety context produced it, and which files a reviewer should open first.
+`manifest.json` records what the pack contains, what Firety context produced it, which files a reviewer should open first, and the focused provenance Firety captured for later reproducibility checks.
 
 `SUMMARY.md` is the human entrypoint for the pack. It points reviewers to the highest-value reports first and lists the included artifacts and rendered summaries.
 
@@ -55,6 +55,12 @@ Fresh packs always include a lint artifact. They can also include:
 Firety validates supplied artifacts before packaging them.
 
 The first version also checks for obviously incompatible artifact inputs, such as artifacts that point at different current targets in the same pack.
+
+Pack manifests can also be inspected later with:
+
+```bash
+firety provenance inspect ./evidence-pack
+```
 
 Firety keeps this conservative:
 

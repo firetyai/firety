@@ -15,6 +15,7 @@ import (
 	domaineval "github.com/firety/firety/internal/domain/eval"
 	domaingate "github.com/firety/firety/internal/domain/gate"
 	"github.com/firety/firety/internal/domain/lint"
+	"github.com/firety/firety/internal/provenance"
 	"github.com/firety/firety/internal/render"
 	"github.com/firety/firety/internal/service"
 )
@@ -58,6 +59,7 @@ type Manifest struct {
 	ReviewSummary          string             `json:"review_summary"`
 	RecommendedEntrypoints []string           `json:"recommended_entrypoints"`
 	Context                PackContext        `json:"context"`
+	Provenance             provenance.Record  `json:"provenance"`
 	Artifacts              []ManifestArtifact `json:"artifacts"`
 	Reports                []ManifestReport   `json:"reports"`
 }
@@ -148,7 +150,10 @@ func (b Builder) Build(target string, options PackOptions) (Result, error) {
 		return Result{}, err
 	}
 
-	manifest := buildManifest(b.application, target, options, packArtifacts, reports)
+	manifest, err := buildManifest(b.application, target, options, packArtifacts, reports)
+	if err != nil {
+		return Result{}, err
+	}
 	if err := writeManifest(filepath.Join(root, "manifest.json"), manifest); err != nil {
 		return Result{}, err
 	}
@@ -501,7 +506,7 @@ func buildRenderedReports(root string, artifacts []packArtifact) ([]ManifestRepo
 	return reports, nil
 }
 
-func buildManifest(application *app.App, target string, options PackOptions, artifacts []packArtifact, reports []ManifestReport) Manifest {
+func buildManifest(application *app.App, target string, options PackOptions, artifacts []packArtifact, reports []ManifestReport) (Manifest, error) {
 	manifestArtifacts := make([]ManifestArtifact, 0, len(artifacts))
 	reviewSummaryParts := make([]string, 0, len(artifacts))
 	for _, item := range artifacts {
@@ -535,7 +540,7 @@ func buildManifest(application *app.App, target string, options PackOptions, art
 		reviewSummary = strings.Join(reviewSummaryParts, " ")
 	}
 
-	return Manifest{
+	manifest := Manifest{
 		SchemaVersion: SchemaVersion,
 		PackType:      PackType,
 		Tool: ToolInfo{
@@ -561,9 +566,11 @@ func buildManifest(application *app.App, target string, options PackOptions, art
 			IncludeCompatibility: options.IncludeCompatibility,
 			IncludeGate:          options.IncludeGate,
 		},
-		Artifacts: manifestArtifacts,
-		Reports:   reports,
+		Provenance: buildPackProvenance(application, target, options, manifestArtifacts),
+		Artifacts:  manifestArtifacts,
+		Reports:    reports,
 	}
+	return manifest, nil
 }
 
 func packSource(options PackOptions) string {
@@ -587,6 +594,75 @@ func currentPackTarget(info artifactview.Inspection) string {
 		return info.CandidateTarget
 	}
 	return strings.TrimSpace(info.Target)
+}
+
+func buildPackProvenance(application *app.App, target string, options PackOptions, artifacts []ManifestArtifact) provenance.Record {
+	record := provenance.NewRecord()
+	record.CommandOrigin = "firety evidence pack"
+	record.FiretyVersion = application.Version.Version
+	record.FiretyCommit = application.Version.Commit
+	record.Target = firstNonEmpty(target, firstNonEmptyArtifactTarget(artifacts))
+	record.Profile = string(options.Profile)
+	record.Strictness = options.Strictness.DisplayName()
+	record.FailOn = options.FailOn
+	record.Explain = options.Explain
+	record.RoutingRisk = options.RoutingRisk
+	record.SuitePath = strings.TrimSpace(options.SuitePath)
+	record.Backends = backendIDs(options.BackendSelections)
+	record.InputArtifacts = append([]string(nil), options.InputArtifacts...)
+	record.ArtifactDependencies = artifactDependencyPaths(artifacts)
+	record.ComparableKey = packComparableKey(options)
+
+	if strings.TrimSpace(target) != "" {
+		fingerprint, err := provenance.FingerprintDirectory(target)
+		if err == nil {
+			record.TargetFingerprint = fingerprint
+		} else {
+			record.ReproducibilityNotes = append(record.ReproducibilityNotes, fmt.Sprintf("target fingerprint could not be computed: %v", err))
+		}
+	} else {
+		record.ReproducibilityNotes = append(record.ReproducibilityNotes, "pack was built from existing artifacts rather than a fresh target run")
+	}
+	if len(options.InputArtifacts) > 0 {
+		record.ReproducibilityNotes = append(record.ReproducibilityNotes, "pack content depends on supplied input artifacts")
+	}
+	if record.SuitePath == "" && len(record.Backends) > 0 {
+		record.ComparabilityNotes = append(record.ComparabilityNotes, "backend evidence is present without an explicit suite path")
+	}
+
+	return provenance.NormalizeRecord(record)
+}
+
+func artifactDependencyPaths(values []ManifestArtifact) []string {
+	out := make([]string, 0, len(values))
+	for _, value := range values {
+		out = append(out, value.Path)
+	}
+	return out
+}
+
+func firstNonEmptyArtifactTarget(values []ManifestArtifact) string {
+	for _, value := range values {
+		if target := firstNonEmpty(value.CandidateTarget, value.Target); target != "" {
+			return target
+		}
+	}
+	return ""
+}
+
+func packComparableKey(options PackOptions) string {
+	parts := []string{
+		"source:" + firstNonEmpty(packSource(options), "fresh-analysis"),
+		"profile:" + string(options.Profile),
+		"strictness:" + options.Strictness.DisplayName(),
+		"fail-on:" + options.FailOn,
+		"suite:" + strings.TrimSpace(options.SuitePath),
+	}
+	backends := backendIDs(options.BackendSelections)
+	if len(backends) > 0 {
+		parts = append(parts, "backends:"+strings.Join(backends, ","))
+	}
+	return strings.Join(parts, "|")
 }
 
 func writeManifest(path string, manifest Manifest) error {

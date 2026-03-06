@@ -137,6 +137,9 @@ firety skill render ./plan-artifact.json --render full-report
 firety skill render ./attestation-artifact.json --render full-report
 firety artifact inspect ./analysis-artifact.json
 firety artifact inspect ./attestation-artifact.json
+firety provenance inspect ./analysis-artifact.json
+firety provenance inspect ./evidence-pack
+firety provenance compare ./baseline-lint.json ./candidate-lint.json
 firety artifact render ./analysis-artifact.json --render pr-comment
 firety artifact compare ./before-lint.json ./after-lint.json
 firety evidence pack ./path/to/skill --output ./evidence-pack
@@ -181,6 +184,8 @@ The rule catalog is also a first-class product surface:
 - `firety skill gate` turns selected Firety evidence into a deterministic PASS/FAIL policy decision
 - `firety skill render <artifact> --render pr-comment|ci-summary|full-report` turns existing artifacts into reviewer-friendly summaries without rerunning analysis
 - `firety artifact inspect <artifact>` validates a saved artifact and explains what it represents
+- `firety provenance inspect <artifact-or-pack-or-report>` explains how a saved result was produced and whether it is suitable for reuse
+- `firety provenance compare <base> <candidate>` explains whether two saved results are meaningfully comparable or should be rerun instead
 - `firety artifact render <artifact> --render pr-comment|ci-summary|full-report` renders a saved artifact without using the original live command path
 - `firety artifact compare <base-artifact> <candidate-artifact>` compares compatible saved artifacts without rerunning analysis
 - `firety evidence pack [path] --output <dir>` packages Firety artifacts and rendered summaries into a deterministic review bundle
@@ -188,6 +193,7 @@ The rule catalog is also a first-class product surface:
 - `firety benchmark run` turns Firety's built-in benchmark corpus into a structured maintainer/public quality summary
 - `firety benchmark render <artifact> --render pr-comment|ci-summary|full-report` renders saved benchmark artifacts without rerunning the corpus
 - artifact-first workflows are documented in [docs/artifacts.md](docs/artifacts.md)
+- provenance and reproducibility workflows are documented in [docs/provenance.md](docs/provenance.md)
 - evidence-pack workflows are documented in [docs/evidence-packs.md](docs/evidence-packs.md)
 - attestation workflows are documented in [docs/attestation.md](docs/attestation.md)
 - trust-report workflows are documented in [docs/trust-report.md](docs/trust-report.md)
@@ -237,6 +243,13 @@ Artifact workflows:
 - `firety artifact render` produces the same reviewer-facing report styles from saved artifacts without rerunning analysis
 - `firety artifact compare` currently supports lint artifacts, single-backend eval artifacts, and multi-backend eval artifacts
 - artifact workflows fail clearly on unsupported schema versions, unsupported artifact kinds, or incompatible compare pairs
+
+Provenance and reproducibility:
+
+- `firety provenance inspect` shows how a saved artifact, evidence pack, or trust report was produced and what context matters for reuse
+- `firety provenance compare` checks whether two saved results are meaningfully comparable or only partially comparable
+- Firety captures focused provenance such as command origin, Firety version, target, profile, strictness, suite, backend set, and artifact dependencies
+- Firety does not claim exact environment reproducibility; it surfaces only the context it actually captures and warns when that context is incomplete
 
 Evidence packs:
 

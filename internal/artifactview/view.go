@@ -252,6 +252,12 @@ func load(path string) (loadedArtifact, error) {
 			return loadedArtifact{}, err
 		}
 		return loadedArtifact{Path: path, Value: value, Inspect: inspectWorkspaceReport(path, value)}, nil
+	case "firety.workspace-change-scope":
+		var value artifact.WorkspaceChangeScopeArtifact
+		if err := json.Unmarshal(data, &value); err != nil {
+			return loadedArtifact{}, err
+		}
+		return loadedArtifact{Path: path, Value: value, Inspect: inspectWorkspaceChangeScope(path, value)}, nil
 	case "firety.benchmark-report":
 		var value artifact.BenchmarkArtifact
 		if err := json.Unmarshal(data, &value); err != nil {
@@ -460,6 +466,19 @@ func inspectWorkspaceReport(path string, value artifact.WorkspaceReportArtifact)
 		Target:               value.Report.WorkspaceRoot,
 		Summary:              fmt.Sprintf("%d skill(s), %d workspace blocker(s), %d top priority item(s).", value.Report.Summary.SkillCount, len(value.Report.Summary.WorkspaceBlockers), len(value.Report.Summary.TopPriorities)),
 		Context:              nonEmptyStrings(fmt.Sprintf("profile %s", value.Run.Profile), fmt.Sprintf("strictness %s", value.Run.Strictness), fmt.Sprintf("context %s", value.Run.PublishContext)),
+		SupportedRenderModes: renderModes(),
+	}
+}
+
+func inspectWorkspaceChangeScope(path string, value artifact.WorkspaceChangeScopeArtifact) Inspection {
+	return Inspection{
+		Path:                 path,
+		ArtifactType:         value.ArtifactType,
+		SchemaVersion:        value.SchemaVersion,
+		Origin:               "firety workspace changes",
+		Target:               value.Scope.WorkspaceRoot,
+		Summary:              value.Scope.Summary,
+		Context:              nonEmptyStrings(value.Scope.DiffContext.Summary, fmt.Sprintf("%d selected skill(s)", len(value.Scope.SelectedSkills))),
 		SupportedRenderModes: renderModes(),
 	}
 }

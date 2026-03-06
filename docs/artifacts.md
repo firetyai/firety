@@ -15,6 +15,7 @@ firety artifact inspect ./lint-artifact.json
 firety artifact inspect ./eval-artifact.json --format json
 firety artifact inspect ./attestation.json
 firety artifact inspect ./readiness.json
+firety artifact inspect ./workspace-scope.json
 firety artifact inspect ./workspace-report.json
 ```
 
@@ -25,6 +26,7 @@ firety artifact render ./analysis-artifact.json --render pr-comment
 firety artifact render ./gate-artifact.json --render ci-summary
 firety artifact render ./attestation.json --render full-report
 firety artifact render ./readiness.json --render full-report
+firety artifact render ./workspace-scope.json --render ci-summary
 firety artifact render ./workspace-report.json --render ci-summary
 firety artifact render ./benchmark-artifact.json --render full-report
 ```
@@ -70,6 +72,7 @@ The first version supports artifact-driven rendering for Firety artifact types t
 - improvement plan
 - quality gate
 - readiness
+- workspace change scope
 - workspace report
 - baseline snapshot
 - baseline compare

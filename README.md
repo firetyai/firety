@@ -35,6 +35,7 @@ firety benchmark render <artifact>
 firety evidence pack [path]
 firety publish report [path]
 firety readiness check [path]
+firety workspace changes [path]
 firety workspace lint [path]
 firety workspace readiness [path]
 firety workspace gate [path]
@@ -156,6 +157,9 @@ firety publish report ./path/to/skill --output ./trust-report --runner ./routing
 firety publish report --input-pack ./evidence-pack --output ./trust-report
 firety readiness check ./path/to/skill --context merge --runner ./routing-runner
 firety readiness check --context public-attestation --input-pack ./evidence-pack
+firety workspace changes ./path/to/repo
+firety workspace changes ./path/to/repo --base origin/main --head HEAD
+firety workspace lint ./path/to/repo --changed
 firety workspace lint ./path/to/repo
 firety workspace readiness ./path/to/repo --context merge
 firety workspace gate ./path/to/repo --context public-release
@@ -206,7 +210,9 @@ The rule catalog is also a first-class product surface:
 - `firety artifact compare <base-artifact> <candidate-artifact>` compares compatible saved artifacts without rerunning analysis
 - `firety evidence pack [path] --output <dir>` packages Firety artifacts and rendered summaries into a deterministic review bundle
 - `firety publish report [path] --output <dir>` turns Firety evidence into a static publishable trust-report bundle
+- `firety workspace changes [path]` uses local git state to detect directly changed and impacted skills
 - `firety workspace lint|readiness|gate|report [path]` discovers all local `SKILL.md` directories under a repository and produces an aggregate workspace summary plus per-skill drilldown
+- `firety workspace lint|readiness|gate|report [path] --changed` limits workspace analysis to the changed or conservatively impacted subset
 - `firety benchmark run` turns Firety's built-in benchmark corpus into a structured maintainer/public quality summary
 - `firety benchmark render <artifact> --render pr-comment|ci-summary|full-report` renders saved benchmark artifacts without rerunning the corpus
 - artifact-first workflows are documented in [docs/artifacts.md](docs/artifacts.md)
@@ -308,6 +314,16 @@ Benchmark reporting:
 - the first version is lint-benchmark focused; it demonstrates benchmark stability, low-noise behavior, and invariant coverage for the built-in fixtures
 - benchmark artifacts are intended for future CI summaries, historical comparisons, and hosted/public benchmark pages without requiring those systems yet
 - benchmark output is deterministic and reviewer-friendly rather than a large raw fixture dump
+
+Workspace change scope:
+
+- `firety workspace changes [path]` detects directly changed skills, indirectly impacted skills, unchanged skills, and scope caveats from local git state
+- by default Firety compares the working tree to `HEAD`
+- use `--base <rev>` and optional `--head <rev>` to scope analysis to an explicit revision range
+- direct changes are files changed inside a skill directory
+- indirect impacts are shared files that Firety can tie back to a skill through current local references
+- ambiguous shared changes widen scope conservatively instead of claiming unaffected skills with weak evidence
+- changed-scope execution is currently supported for `workspace lint`, `workspace readiness`, `workspace gate`, and `workspace report`
 
 Quality gate:
 

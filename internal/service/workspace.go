@@ -15,14 +15,16 @@ import (
 const workspaceSkillFileName = "SKILL.md"
 
 type WorkspaceAnalyzeOptions struct {
-	Profile          SkillLintProfile
-	Strictness       lint.Strictness
-	IncludeReadiness bool
-	ReadinessContext readiness.PublishContext
-	SuitePath        string
-	Runner           string
-	Backends         []SkillEvalBackendSelection
-	GateCriteria     *workspacepkg.GateCriteria
+	Profile            SkillLintProfile
+	Strictness         lint.Strictness
+	IncludeReadiness   bool
+	ReadinessContext   readiness.PublishContext
+	SuitePath          string
+	Runner             string
+	Backends           []SkillEvalBackendSelection
+	GateCriteria       *workspacepkg.GateCriteria
+	SelectedSkillPaths []string
+	ChangeScope        *workspacepkg.ChangeScope
 }
 
 type WorkspaceService struct {
@@ -44,7 +46,8 @@ func (s WorkspaceService) Analyze(root string, options WorkspaceAnalyzeOptions) 
 	}
 
 	skills := make([]workspacepkg.SkillResult, 0, len(discovery.Skills))
-	for _, skill := range discovery.Skills {
+	selectedSkills := filterWorkspaceSkills(discovery.Skills, options.SelectedSkillPaths)
+	for _, skill := range selectedSkills {
 		lintReport, err := s.linter.LintWithProfileAndStrictness(skill.Path, options.Profile, options.Strictness)
 		if err != nil {
 			return workspacepkg.Report{}, fmt.Errorf("lint %s: %w", skill.Path, err)
@@ -94,6 +97,7 @@ func (s WorkspaceService) Analyze(root string, options WorkspaceAnalyzeOptions) 
 	report := workspacepkg.Report{
 		WorkspaceRoot: discovery.WorkspaceRoot,
 		Discovery:     discovery,
+		ChangeScope:   options.ChangeScope,
 		Skills:        skills,
 	}
 	report.Summary = workspacepkg.BuildSummary(report.Skills, report.Discovery.Warnings)
@@ -199,4 +203,21 @@ func workspaceFirstStrings(values []string, limit int) []string {
 		return append([]string(nil), values...)
 	}
 	return append([]string(nil), values[:limit]...)
+}
+
+func filterWorkspaceSkills(skills []workspacepkg.SkillRef, selectedPaths []string) []workspacepkg.SkillRef {
+	if len(selectedPaths) == 0 {
+		return append([]workspacepkg.SkillRef(nil), skills...)
+	}
+	selected := make(map[string]struct{}, len(selectedPaths))
+	for _, path := range selectedPaths {
+		selected[path] = struct{}{}
+	}
+	out := make([]workspacepkg.SkillRef, 0, len(skills))
+	for _, skill := range skills {
+		if _, ok := selected[skill.Path]; ok {
+			out = append(out, skill)
+		}
+	}
+	return out
 }

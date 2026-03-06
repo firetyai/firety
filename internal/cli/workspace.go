@@ -26,6 +26,9 @@ type workspaceSharedOptions struct {
 	suite      string
 	runner     string
 	backends   []string
+	changed    bool
+	base       string
+	head       string
 }
 
 type workspaceGateOptions struct {
@@ -51,11 +54,53 @@ func newWorkspaceCommand(application *app.App) *cobra.Command {
 	}
 
 	cmd.AddCommand(
+		newWorkspaceChangesCommand(application),
 		newWorkspaceLintCommand(application),
 		newWorkspaceReadinessCommand(application),
 		newWorkspaceGateCommand(application),
 		newWorkspaceReportCommand(application),
 	)
+	return cmd
+}
+
+func newWorkspaceChangesCommand(application *app.App) *cobra.Command {
+	shared := defaultWorkspaceSharedOptions()
+	reportOptions := workspaceReportOptions{}
+	cmd := &cobra.Command{
+		Use:   "changes [path]",
+		Short: "Detect directly changed and impacted skills from local git state",
+		Args:  cobra.MaximumNArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			if err := shared.validateChangeScope(); err != nil {
+				return newExitError(ExitCodeRuntime, err)
+			}
+			scope, err := application.Services.Workspace.Changes(workspaceTargetArg(args), service.WorkspaceChangeOptions{
+				BaseRev: shared.base,
+				HeadRev: shared.head,
+			})
+			if err != nil {
+				return newExitError(ExitCodeRuntime, err)
+			}
+			if err := writeWorkspaceChangesReport(cmd.OutOrStdout(), scope, shared.format); err != nil {
+				return newExitError(ExitCodeRuntime, err)
+			}
+			if reportOptions.artifact != "" {
+				value := artifact.BuildWorkspaceChangeScopeArtifact(application.Version, scope, artifact.WorkspaceChangeScopeArtifactOptions{
+					Format:        shared.format,
+					WorkspaceRoot: workspaceTargetArg(args),
+					BaseRev:       shared.base,
+					HeadRev:       shared.head,
+				})
+				if err := artifact.WriteWorkspaceChangeScopeArtifact(reportOptions.artifact, value); err != nil {
+					return newExitError(ExitCodeRuntime, err)
+				}
+			}
+			return nil
+		},
+	}
+	cmd.Flags().StringVar(&shared.format, "format", skillLintFormatText, "Output format: text or json")
+	addWorkspaceChangeFlags(cmd, &shared)
+	cmd.Flags().StringVar(&reportOptions.artifact, "artifact", "", "Write a versioned workspace change-scope artifact to the given file path")
 	return cmd
 }
 
@@ -83,6 +128,7 @@ func newWorkspaceLintCommand(application *app.App) *cobra.Command {
 		},
 	}
 	addWorkspaceSharedFlags(cmd, &shared, false)
+	addWorkspaceChangeFlags(cmd, &shared)
 	return cmd
 }
 
@@ -110,6 +156,7 @@ func newWorkspaceReadinessCommand(application *app.App) *cobra.Command {
 		},
 	}
 	addWorkspaceSharedFlags(cmd, &shared, true)
+	addWorkspaceChangeFlags(cmd, &shared)
 	return cmd
 }
 
@@ -139,6 +186,7 @@ func newWorkspaceGateCommand(application *app.App) *cobra.Command {
 		},
 	}
 	addWorkspaceSharedFlags(cmd, &shared, true)
+	addWorkspaceChangeFlags(cmd, &shared)
 	addWorkspaceGateFlags(cmd, &gateOptions)
 	return cmd
 }
@@ -186,6 +234,7 @@ func newWorkspaceReportCommand(application *app.App) *cobra.Command {
 		},
 	}
 	addWorkspaceSharedFlags(cmd, &shared, true)
+	addWorkspaceChangeFlags(cmd, &shared)
 	addWorkspaceGateFlags(cmd, &gateOptions)
 	cmd.Flags().StringVar(&reportOptions.artifact, "artifact", "", "Write a versioned workspace report artifact to the given file path")
 	return cmd
@@ -221,6 +270,12 @@ func addWorkspaceSharedFlags(cmd *cobra.Command, options *workspaceSharedOptions
 	}
 }
 
+func addWorkspaceChangeFlags(cmd *cobra.Command, options *workspaceSharedOptions) {
+	cmd.Flags().BoolVar(&options.changed, "changed", false, "Limit workspace analysis to directly changed or impacted skills from local git state")
+	cmd.Flags().StringVar(&options.base, "base", "", "Base git revision for changed-scope analysis; defaults to working tree vs HEAD when omitted")
+	cmd.Flags().StringVar(&options.head, "head", "", "Head git revision for changed-scope analysis; requires --base")
+}
+
 func addWorkspaceGateFlags(cmd *cobra.Command, options *workspaceGateOptions) {
 	cmd.Flags().IntVar(&options.maxNotReadySkills, "max-not-ready-skills", 0, "Maximum allowed number of not-ready skills")
 	cmd.Flags().IntVar(&options.maxInsufficientEvidenceSkills, "max-insufficient-evidence-skills", 0, "Maximum allowed number of insufficient-evidence skills")
@@ -241,13 +296,20 @@ func (o workspaceSharedOptions) validate(includeReadiness bool) error {
 		return err
 	}
 	if !includeReadiness {
-		return nil
+		return o.validateChangeScope()
 	}
 	if _, err := readiness.ParsePublishContext(o.context); err != nil {
 		return err
 	}
 	if len(o.backends) > 0 && o.runner != "" {
 		return fmt.Errorf("--runner cannot be combined with --backend")
+	}
+	return o.validateChangeScope()
+}
+
+func (o workspaceSharedOptions) validateChangeScope() error {
+	if strings.TrimSpace(o.head) != "" && strings.TrimSpace(o.base) == "" {
+		return fmt.Errorf("--head requires --base")
 	}
 	return nil
 }
@@ -287,15 +349,36 @@ func analyzeWorkspace(
 			return workspacepkg.Report{}, err
 		}
 	}
-	return application.Services.Workspace.Analyze(workspaceTargetArg(args), service.WorkspaceAnalyzeOptions{
-		Profile:          profile,
-		Strictness:       strictness,
-		IncludeReadiness: includeReadiness,
-		ReadinessContext: contextValue,
-		SuitePath:        shared.suite,
-		Runner:           shared.runner,
-		Backends:         backends,
-		GateCriteria:     criteria,
+	target := workspaceTargetArg(args)
+	var (
+		scope         *workspacepkg.ChangeScope
+		selectedPaths []string
+	)
+	if shared.changed {
+		calculated, err := application.Services.Workspace.Changes(target, service.WorkspaceChangeOptions{
+			BaseRev: shared.base,
+			HeadRev: shared.head,
+		})
+		if err != nil {
+			return workspacepkg.Report{}, err
+		}
+		scope = &calculated
+		selectedPaths = make([]string, 0, len(calculated.SelectedSkills))
+		for _, skill := range calculated.SelectedSkills {
+			selectedPaths = append(selectedPaths, skill.Path)
+		}
+	}
+	return application.Services.Workspace.Analyze(target, service.WorkspaceAnalyzeOptions{
+		Profile:            profile,
+		Strictness:         strictness,
+		IncludeReadiness:   includeReadiness,
+		ReadinessContext:   contextValue,
+		SuitePath:          shared.suite,
+		Runner:             shared.runner,
+		Backends:           backends,
+		GateCriteria:       criteria,
+		SelectedSkillPaths: selectedPaths,
+		ChangeScope:        scope,
 	})
 }
 
@@ -363,15 +446,36 @@ func writeWorkspaceJSON(w io.Writer, report workspacepkg.Report) error {
 	return encoder.Encode(payload)
 }
 
+func writeWorkspaceChangesReport(w io.Writer, scope workspacepkg.ChangeScope, format string) error {
+	switch format {
+	case skillLintFormatText:
+		return writeWorkspaceChangesText(w, scope)
+	case skillLintFormatJSON:
+		payload := struct {
+			SchemaVersion string                   `json:"schema_version"`
+			Scope         workspacepkg.ChangeScope `json:"scope"`
+		}{
+			SchemaVersion: workspaceJSONSchemaVersion,
+			Scope:         scope,
+		}
+		encoder := json.NewEncoder(w)
+		encoder.SetIndent("", "  ")
+		return encoder.Encode(payload)
+	default:
+		return fmt.Errorf("invalid format %q", format)
+	}
+}
+
 func writeWorkspaceLintText(w io.Writer, report workspacepkg.Report) error {
-	lines := []string{
+	lines := workspaceScopeHeader(report.ChangeScope)
+	lines = append(lines,
 		fmt.Sprintf("Workspace: %s", report.WorkspaceRoot),
 		fmt.Sprintf("Skills: %d", report.Summary.SkillCount),
 		fmt.Sprintf("Clean: %d", report.Summary.CleanSkills),
 		fmt.Sprintf("With warnings: %d", report.Summary.SkillsWithWarnings),
 		fmt.Sprintf("With lint errors: %d", report.Summary.SkillsWithLintErrors),
 		fmt.Sprintf("Totals: %d lint error(s), %d lint warning(s)", report.Summary.TotalLintErrors, report.Summary.TotalLintWarnings),
-	}
+	)
 	if len(report.Discovery.Warnings) > 0 {
 		lines = append(lines, "Discovery warnings:")
 		for _, warning := range report.Discovery.Warnings {
@@ -387,14 +491,15 @@ func writeWorkspaceLintText(w io.Writer, report workspacepkg.Report) error {
 }
 
 func writeWorkspaceReadinessText(w io.Writer, report workspacepkg.Report) error {
-	lines := []string{
+	lines := workspaceScopeHeader(report.ChangeScope)
+	lines = append(lines,
 		fmt.Sprintf("Workspace: %s", report.WorkspaceRoot),
 		fmt.Sprintf("Skills: %d", report.Summary.SkillCount),
 		fmt.Sprintf("Ready: %d", report.Summary.ReadySkills),
 		fmt.Sprintf("Ready with caveats: %d", report.Summary.ReadyWithCaveatsSkills),
 		fmt.Sprintf("Not ready: %d", report.Summary.NotReadySkills),
 		fmt.Sprintf("Insufficient evidence: %d", report.Summary.InsufficientEvidenceSkills),
-	}
+	)
 	if len(report.Summary.WorkspaceBlockers) > 0 {
 		lines = append(lines, "Top blockers:")
 		for _, item := range report.Summary.WorkspaceBlockers[:min(len(report.Summary.WorkspaceBlockers), 5)] {
@@ -417,7 +522,8 @@ func writeWorkspaceGateText(w io.Writer, report workspacepkg.Report) error {
 	if report.Gate == nil {
 		return fmt.Errorf("workspace gate result is missing")
 	}
-	lines := []string{
+	lines := workspaceScopeHeader(report.ChangeScope)
+	lines = append(lines,
 		fmt.Sprintf("Decision: %s", strings.ToUpper(string(report.Gate.Decision))),
 		fmt.Sprintf("Workspace: %s", report.WorkspaceRoot),
 		fmt.Sprintf("Summary: %s", report.Gate.Summary),
@@ -427,7 +533,7 @@ func writeWorkspaceGateText(w io.Writer, report workspacepkg.Report) error {
 			report.Gate.Metrics.SkillsWithLintErrors,
 			report.Gate.Metrics.DiscoveryWarnings,
 		),
-	}
+	)
 	if len(report.Gate.BlockingReasons) > 0 {
 		lines = append(lines, "Blocking reasons:")
 		for _, reason := range report.Gate.BlockingReasons {
@@ -439,7 +545,8 @@ func writeWorkspaceGateText(w io.Writer, report workspacepkg.Report) error {
 }
 
 func writeWorkspaceFullText(w io.Writer, report workspacepkg.Report) error {
-	lines := []string{
+	lines := workspaceScopeHeader(report.ChangeScope)
+	lines = append(lines,
 		fmt.Sprintf("Workspace: %s", report.WorkspaceRoot),
 		fmt.Sprintf("Skills discovered: %d", report.Summary.SkillCount),
 		fmt.Sprintf("Lint totals: %d error(s), %d warning(s)", report.Summary.TotalLintErrors, report.Summary.TotalLintWarnings),
@@ -449,7 +556,7 @@ func writeWorkspaceFullText(w io.Writer, report workspacepkg.Report) error {
 			report.Summary.NotReadySkills,
 			report.Summary.InsufficientEvidenceSkills,
 		),
-	}
+	)
 	if report.Gate != nil {
 		lines = append(lines, fmt.Sprintf("Workspace gate: %s", strings.ToUpper(string(report.Gate.Decision))))
 	}
@@ -472,4 +579,51 @@ func writeWorkspaceFullText(w io.Writer, report workspacepkg.Report) error {
 	}
 	_, err := fmt.Fprintln(w, strings.Join(lines, "\n"))
 	return err
+}
+
+func writeWorkspaceChangesText(w io.Writer, scope workspacepkg.ChangeScope) error {
+	lines := []string{
+		fmt.Sprintf("Workspace: %s", scope.WorkspaceRoot),
+		fmt.Sprintf("Diff: %s", scope.DiffContext.Summary),
+		fmt.Sprintf("Summary: %s", scope.Summary),
+	}
+	if len(scope.DirectlyChangedSkills) > 0 {
+		lines = append(lines, "Directly changed skills:")
+		for _, skill := range scope.DirectlyChangedSkills {
+			lines = append(lines, "- "+skill.Name)
+		}
+	}
+	if len(scope.ImpactedSkills) > 0 {
+		lines = append(lines, "Impacted skills:")
+		for _, skill := range scope.ImpactedSkills {
+			lines = append(lines, "- "+skill.Name)
+		}
+	}
+	if len(scope.Caveats) > 0 {
+		lines = append(lines, "Caveats:")
+		for _, caveat := range scope.Caveats {
+			lines = append(lines, "- "+caveat)
+		}
+	}
+	if len(scope.SelectedSkills) > 0 {
+		lines = append(lines, fmt.Sprintf("Selected analysis scope: %d skill(s)", len(scope.SelectedSkills)))
+	}
+	_, err := fmt.Fprintln(w, strings.Join(lines, "\n"))
+	return err
+}
+
+func workspaceScopeHeader(scope *workspacepkg.ChangeScope) []string {
+	if scope == nil {
+		return nil
+	}
+	lines := []string{
+		fmt.Sprintf("Changed scope: %s", scope.Summary),
+	}
+	if len(scope.Caveats) > 0 {
+		lines = append(lines, "Scope caveats:")
+		for _, caveat := range scope.Caveats[:min(len(scope.Caveats), 3)] {
+			lines = append(lines, "- "+caveat)
+		}
+	}
+	return lines
 }

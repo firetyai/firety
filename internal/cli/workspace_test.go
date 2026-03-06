@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -33,6 +34,72 @@ func TestWorkspaceLintCommandSummarizesSkills(t *testing.T) {
 	}
 }
 
+func TestWorkspaceChangesCommandReportsDirectSkillChange(t *testing.T) {
+	t.Parallel()
+
+	root := t.TempDir()
+	writeWorkspaceFixture(t, root)
+	initWorkspaceGitRepo(t, root)
+	testutil.WriteFiles(t, root, map[string]string{
+		"skills/alpha/SKILL.md": testutil.ValidSkillFiles()["SKILL.md"] + "\nchanged\n",
+	})
+
+	stdout, stderr, code, err := executeWorkspace(t, "changes", root)
+	if err != nil {
+		t.Fatalf("expected no runtime error, got %v", err)
+	}
+	if code != cli.ExitCodeOK || stderr != "" {
+		t.Fatalf("expected successful changes output, got code=%d stderr=%q err=%v", code, stderr, err)
+	}
+	if !strings.Contains(stdout, "Directly changed skills:") || !strings.Contains(stdout, "alpha") {
+		t.Fatalf("expected direct skill change summary, got %q", stdout)
+	}
+}
+
+func TestWorkspaceChangesCommandArtifactAndRender(t *testing.T) {
+	t.Parallel()
+
+	root := t.TempDir()
+	artifactPath := filepath.Join(t.TempDir(), "workspace-scope.json")
+	writeWorkspaceFixture(t, root)
+	initWorkspaceGitRepo(t, root)
+	testutil.WriteFiles(t, root, map[string]string{
+		"skills/alpha/SKILL.md": testutil.ValidSkillFiles()["SKILL.md"] + "\nchanged\n",
+	})
+
+	stdout, stderr, code, err := executeWorkspace(t, "changes", root, "--format", "json", "--artifact", artifactPath)
+	if err != nil {
+		t.Fatalf("expected no runtime error, got %v", err)
+	}
+	if code != cli.ExitCodeOK || stderr != "" {
+		t.Fatalf("expected successful changes command, got code=%d stderr=%q err=%v", code, stderr, err)
+	}
+
+	var payload struct {
+		SchemaVersion string `json:"schema_version"`
+		Scope         struct {
+			Summary string `json:"summary"`
+		} `json:"scope"`
+	}
+	if err := json.Unmarshal([]byte(stdout), &payload); err != nil {
+		t.Fatalf("expected valid json, got %v; output=%q", err, stdout)
+	}
+	if payload.SchemaVersion != "1" || payload.Scope.Summary == "" {
+		t.Fatalf("unexpected scope payload: %#v", payload)
+	}
+
+	rendered, stderr, code, err := executeArtifact(t, "render", artifactPath, "--render", "ci-summary")
+	if err != nil {
+		t.Fatalf("expected no runtime error, got %v", err)
+	}
+	if code != cli.ExitCodeOK || stderr != "" {
+		t.Fatalf("expected successful artifact render, got code=%d stderr=%q err=%v", code, stderr, err)
+	}
+	if !strings.Contains(rendered, "Firety Workspace Change Scope") {
+		t.Fatalf("expected workspace change scope render, got %q", rendered)
+	}
+}
+
 func TestWorkspaceReadinessCommandShowsPerSkillDecisions(t *testing.T) {
 	t.Parallel()
 
@@ -51,6 +118,31 @@ func TestWorkspaceReadinessCommandShowsPerSkillDecisions(t *testing.T) {
 	}
 	if !strings.Contains(stdout, "Not ready:") || !strings.Contains(stdout, "Per skill:") {
 		t.Fatalf("expected readiness summary, got %q", stdout)
+	}
+}
+
+func TestWorkspaceLintCommandChangedScopeSkipsUnchangedBrokenSkill(t *testing.T) {
+	t.Parallel()
+
+	root := t.TempDir()
+	writeWorkspaceFixture(t, root)
+	initWorkspaceGitRepo(t, root)
+	testutil.WriteFiles(t, root, map[string]string{
+		"skills/alpha/SKILL.md": testutil.ValidSkillFiles()["SKILL.md"] + "\nchanged\n",
+	})
+
+	stdout, stderr, code, err := executeWorkspace(t, "lint", root, "--changed")
+	if err != nil {
+		t.Fatalf("expected no runtime error, got %v", err)
+	}
+	if code != cli.ExitCodeOK {
+		t.Fatalf("expected changed-scope lint to skip unchanged broken skill, got code=%d stdout=%q", code, stdout)
+	}
+	if stderr != "" {
+		t.Fatalf("expected empty stderr, got %q", stderr)
+	}
+	if !strings.Contains(stdout, "Changed scope:") || strings.Contains(stdout, "bravo") {
+		t.Fatalf("expected changed-scope summary without unchanged broken skill drilldown, got %q", stdout)
 	}
 }
 
@@ -161,4 +253,22 @@ func writeWorkspaceFixture(t *testing.T, root string) {
 		"skills/alpha/docs/reference.md": testutil.ValidSkillFiles()["docs/reference.md"],
 		"skills/bravo/SKILL.md":          "tiny skill without a markdown title\n",
 	})
+}
+
+func initWorkspaceGitRepo(t *testing.T, root string) {
+	t.Helper()
+	runWorkspaceGit(t, root, "init")
+	runWorkspaceGit(t, root, "config", "user.email", "test@example.com")
+	runWorkspaceGit(t, root, "config", "user.name", "Test User")
+	runWorkspaceGit(t, root, "add", ".")
+	runWorkspaceGit(t, root, "commit", "-m", "initial")
+}
+
+func runWorkspaceGit(t *testing.T, root string, args ...string) {
+	t.Helper()
+	command := exec.Command("git", append([]string{"-C", root}, args...)...)
+	output, err := command.CombinedOutput()
+	if err != nil {
+		t.Fatalf("git %s failed: %v\n%s", strings.Join(args, " "), err, string(output))
+	}
 }

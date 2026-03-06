@@ -12,6 +12,7 @@ import (
 	"github.com/firety/firety/internal/domain/attestation"
 	domaineval "github.com/firety/firety/internal/domain/eval"
 	"github.com/firety/firety/internal/domain/gate"
+	workspacepkg "github.com/firety/firety/internal/domain/workspace"
 )
 
 type Mode string
@@ -71,6 +72,12 @@ func RenderArtifact(path string, mode Mode) (string, error) {
 			return "", err
 		}
 		return renderWorkspaceReportArtifact(path, value, mode), nil
+	case "firety.workspace-change-scope":
+		var value artifact.WorkspaceChangeScopeArtifact
+		if err := json.Unmarshal(data, &value); err != nil {
+			return "", err
+		}
+		return renderWorkspaceChangeScopeArtifact(path, value, mode), nil
 	case "firety.skill-baseline":
 		var value artifact.SkillBaselineSnapshotArtifact
 		if err := json.Unmarshal(data, &value); err != nil {
@@ -304,6 +311,45 @@ func renderWorkspaceReportArtifact(path string, value artifact.WorkspaceReportAr
 		writeLine(&b, fmt.Sprintf("Artifact: %s", path))
 	}
 	return strings.TrimSpace(b.String()) + "\n"
+}
+
+func renderWorkspaceChangeScopeArtifact(path string, value artifact.WorkspaceChangeScopeArtifact, mode Mode) string {
+	var b strings.Builder
+	writeTitle(&b, mode, "Firety Workspace Change Scope")
+	writeLine(&b, fmt.Sprintf("Workspace: %s", value.Scope.WorkspaceRoot))
+	writeLine(&b, fmt.Sprintf("Diff: %s", value.Scope.DiffContext.Summary))
+	writeLine(&b, fmt.Sprintf("Summary: %s", value.Scope.Summary))
+	if len(value.Scope.DirectlyChangedSkills) > 0 {
+		writeSectionHeader(&b, mode, "Directly changed")
+		for _, skill := range firstSkillNames(value.Scope.DirectlyChangedSkills, 5) {
+			writeBullet(&b, skill)
+		}
+	}
+	if len(value.Scope.ImpactedSkills) > 0 && mode != ModePRComment {
+		writeSectionHeader(&b, mode, "Impacted")
+		for _, skill := range firstSkillNames(value.Scope.ImpactedSkills, 5) {
+			writeBullet(&b, skill)
+		}
+	}
+	if len(value.Scope.Caveats) > 0 && mode == ModeFullReport {
+		writeSectionHeader(&b, mode, "Caveats")
+		for _, caveat := range firstStrings(value.Scope.Caveats, 5) {
+			writeBullet(&b, caveat)
+		}
+		writeLine(&b, fmt.Sprintf("Artifact: %s", path))
+	}
+	return strings.TrimSpace(b.String()) + "\n"
+}
+
+func firstSkillNames(skills []workspacepkg.SkillRef, limit int) []string {
+	values := make([]string, 0, min(len(skills), limit))
+	for _, skill := range skills {
+		values = append(values, skill.Name)
+		if len(values) == limit {
+			break
+		}
+	}
+	return values
 }
 
 func renderBaselineSnapshotArtifact(path string, value artifact.SkillBaselineSnapshotArtifact, mode Mode) string {

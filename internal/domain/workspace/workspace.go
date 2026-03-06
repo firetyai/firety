@@ -91,6 +91,7 @@ type GateMetrics struct {
 type Report struct {
 	WorkspaceRoot string        `json:"workspace_root"`
 	Discovery     Discovery     `json:"discovery"`
+	ChangeScope   *ChangeScope  `json:"change_scope,omitempty"`
 	Summary       Summary       `json:"summary"`
 	Skills        []SkillResult `json:"skills"`
 	Gate          *GateResult   `json:"gate,omitempty"`

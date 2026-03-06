@@ -13,11 +13,32 @@ Workspace mode does not introduce a project config file or a separate orchestrat
 ## Commands
 
 ```bash
+firety workspace changes ./path/to/repo
+firety workspace changes ./path/to/repo --base origin/main --head HEAD
 firety workspace lint ./path/to/repo
+firety workspace lint ./path/to/repo --changed
 firety workspace readiness ./path/to/repo --context merge
 firety workspace gate ./path/to/repo --context public-release
 firety workspace report ./path/to/repo --artifact ./workspace-report.json
 ```
+
+## Git-aware changed scope
+
+Firety can scope workspace analysis to the skills that actually changed in git.
+
+The first version supports:
+
+- working tree vs `HEAD`
+- explicit revision range with `--base <rev>` and optional `--head <rev>`
+
+Firety separates:
+
+- directly changed skills: changed files inside the skill directory
+- impacted skills: shared files that Firety can already tie back to a skill through current local references
+- unchanged skills: discovered skills outside the selected scope
+- ambiguous impacts: shared workspace changes that make a narrow scope unreliable
+
+When Firety cannot confidently prove a skill is unaffected, it widens scope conservatively and records a caveat instead of claiming false precision.
 
 ## Discovery behavior
 
@@ -44,6 +65,8 @@ The first version focuses on high-value aggregate questions:
 - whether a modest workspace gate passed or failed
 
 Per-skill results are still kept visible. Workspace mode is not meant to flatten important regressions into one vague score.
+
+When `--changed` is used on `workspace lint`, `workspace readiness`, `workspace gate`, or `workspace report`, Firety runs the selected workflow only on the changed or conservatively impacted subset and prints the selected scope first.
 
 ## Workspace gate
 
@@ -73,12 +96,15 @@ That artifact can be:
 - rendered with `firety artifact render --render pr-comment|ci-summary|full-report`
 - attached to CI or review workflows without rerunning the workspace analysis
 
+`firety workspace changes --artifact <path>` writes a sibling `firety.workspace-change-scope` artifact for offline scope inspection and rendering.
+
 ## Limitations
 
 This first version intentionally does not include:
 
 - workspace-wide measured eval orchestration
 - workspace compare or workspace baseline flows
+- git hosting integrations or PR metadata APIs
 - workspace evidence packs or trust-report publishing
 - repository-level policy configuration
 - MCP-aware workspace analysis

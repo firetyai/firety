@@ -4,6 +4,7 @@ Firety artifacts are first-class saved outputs. They are meant to support offlin
 
 For a higher-level shareable bundle built from those artifacts, see [docs/evidence-packs.md](evidence-packs.md).
 For reproducibility and comparability checks across artifacts, packs, and trust reports, see [docs/provenance.md](provenance.md).
+For evidence age and recertification checks on saved outputs, see [docs/freshness.md](freshness.md).
 
 ## Commands
 

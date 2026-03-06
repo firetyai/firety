@@ -137,6 +137,9 @@ firety skill render ./plan-artifact.json --render full-report
 firety skill render ./attestation-artifact.json --render full-report
 firety artifact inspect ./analysis-artifact.json
 firety artifact inspect ./attestation-artifact.json
+firety freshness inspect ./attestation-artifact.json
+firety freshness inspect ./evidence-pack
+firety freshness inspect ./trust-report --max-report-age 48h
 firety provenance inspect ./analysis-artifact.json
 firety provenance inspect ./evidence-pack
 firety provenance compare ./baseline-lint.json ./candidate-lint.json
@@ -184,6 +187,7 @@ The rule catalog is also a first-class product surface:
 - `firety skill gate` turns selected Firety evidence into a deterministic PASS/FAIL policy decision
 - `firety skill render <artifact> --render pr-comment|ci-summary|full-report` turns existing artifacts into reviewer-friendly summaries without rerunning analysis
 - `firety artifact inspect <artifact>` validates a saved artifact and explains what it represents
+- `firety freshness inspect <artifact-or-pack-or-report>` tells you whether saved evidence is still current enough to trust and what should be recertified
 - `firety provenance inspect <artifact-or-pack-or-report>` explains how a saved result was produced and whether it is suitable for reuse
 - `firety provenance compare <base> <candidate>` explains whether two saved results are meaningfully comparable or should be rerun instead
 - `firety artifact render <artifact> --render pr-comment|ci-summary|full-report` renders a saved artifact without using the original live command path
@@ -193,6 +197,7 @@ The rule catalog is also a first-class product surface:
 - `firety benchmark run` turns Firety's built-in benchmark corpus into a structured maintainer/public quality summary
 - `firety benchmark render <artifact> --render pr-comment|ci-summary|full-report` renders saved benchmark artifacts without rerunning the corpus
 - artifact-first workflows are documented in [docs/artifacts.md](docs/artifacts.md)
+- evidence freshness and recertification workflows are documented in [docs/freshness.md](docs/freshness.md)
 - provenance and reproducibility workflows are documented in [docs/provenance.md](docs/provenance.md)
 - evidence-pack workflows are documented in [docs/evidence-packs.md](docs/evidence-packs.md)
 - attestation workflows are documented in [docs/attestation.md](docs/attestation.md)
@@ -250,6 +255,14 @@ Provenance and reproducibility:
 - `firety provenance compare` checks whether two saved results are meaningfully comparable or only partially comparable
 - Firety captures focused provenance such as command origin, Firety version, target, profile, strictness, suite, backend set, and artifact dependencies
 - Firety does not claim exact environment reproducibility; it surfaces only the context it actually captures and warns when that context is incomplete
+
+Evidence freshness and recertification:
+
+- `firety freshness inspect` evaluates whether saved artifacts, evidence packs, trust reports, or attestations are still current enough for reuse
+- Firety classifies saved evidence as `fresh`, `usable-with-caveats`, `stale`, or `insufficient-evidence`
+- freshness is based on saved file timestamps plus the supporting provenance and dependency relationships Firety can actually see
+- Firety keeps intended use explicit: compare, baseline, publish, release-claim, and debug suitability are reported separately when useful
+- recertification advice is intentionally short and operational, such as rerun lint, rerun eval, rebuild a pack, or regenerate an attestation
 
 Evidence packs:
 

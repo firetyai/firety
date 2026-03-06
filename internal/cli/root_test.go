@@ -1,6 +1,7 @@
 package cli_test
 
 import (
+	"bytes"
 	"io"
 	"strings"
 	"testing"
@@ -33,9 +34,14 @@ func TestRootCommandHelp(t *testing.T) {
 		t.Fatalf("expected empty stderr, got %q", stderr)
 	}
 
-	for _, expected := range []string{"artifact", "benchmark", "evidence", "freshness", "publish", "provenance", "readiness", "skill", "workspace", "mcp", "agent", "version"} {
+	for _, expected := range []string{"skill"} {
 		if !strings.Contains(stdout, expected) {
 			t.Fatalf("expected help output to contain %q, got %q", expected, stdout)
+		}
+	}
+	for _, hidden := range []string{"artifact", "benchmark", "evidence", "freshness", "publish", "provenance", "readiness", "workspace", "mcp", "agent"} {
+		if strings.Contains(stdout, hidden) {
+			t.Fatalf("expected help output to hide %q, got %q", hidden, stdout)
 		}
 	}
 }
@@ -85,7 +91,7 @@ func TestPlaceholderCommands(t *testing.T) {
 func TestSkillCommandHelp(t *testing.T) {
 	t.Parallel()
 
-	stdout, stderr, err := testutil.ExecuteCommand(t, newTestCommand, "skill")
+	stdout, stderr, err := testutil.ExecuteCommand(t, newTestCommand, "skill", "--help")
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
@@ -94,10 +100,34 @@ func TestSkillCommandHelp(t *testing.T) {
 		t.Fatalf("expected empty stderr, got %q", stderr)
 	}
 
-	for _, expected := range []string{"lint", "attest", "baseline", "compatibility", "plan", "analyze", "eval", "eval-compare", "gate", "compare", "render", "rules"} {
-		if !strings.Contains(stdout, expected) {
-			t.Fatalf("expected help output to contain %q, got %q", expected, stdout)
+	if !strings.Contains(stdout, "lint") {
+		t.Fatalf("expected help output to contain lint, got %q", stdout)
+	}
+	for _, hidden := range []string{"attest", "baseline", "compatibility", "plan", "analyze", "eval", "eval-compare", "gate", "compare", "render", "rules"} {
+		if strings.Contains(stdout, hidden) {
+			t.Fatalf("expected help output to hide %q, got %q", hidden, stdout)
 		}
+	}
+}
+
+func TestSkillCommandDefaultsToLint(t *testing.T) {
+	t.Parallel()
+
+	root := t.TempDir()
+	testutil.WriteFiles(t, root, testutil.ValidSkillFiles())
+
+	stdout, stderr, code, err := executeSkill(t, root)
+	if err != nil {
+		t.Fatalf("expected no runtime error, got %v", err)
+	}
+	if code != cli.ExitCodeOK {
+		t.Fatalf("expected exit code %d, got %d", cli.ExitCodeOK, code)
+	}
+	if stderr != "" {
+		t.Fatalf("expected empty stderr, got %q", stderr)
+	}
+	if !strings.Contains(stdout, "valid") && !strings.Contains(stdout, "0 error") && !strings.Contains(stdout, "warning") {
+		t.Fatalf("expected lint-style output, got %q", stdout)
 	}
 }
 
@@ -117,4 +147,15 @@ func TestVersionCommand(t *testing.T) {
 	if stderr != "" {
 		t.Fatalf("expected empty stderr, got %q", stderr)
 	}
+}
+
+func executeSkill(t *testing.T, root string, args ...string) (string, string, int, error) {
+	t.Helper()
+
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+
+	commandArgs := append([]string{"skill", root}, args...)
+	code, err := cli.Execute(newTestApplication(), &stdout, &stderr, commandArgs...)
+	return stdout.String(), stderr.String(), code, err
 }

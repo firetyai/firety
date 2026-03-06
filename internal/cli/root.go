@@ -10,8 +10,8 @@ import (
 func NewRootCommand(application *app.App, stdout, stderr io.Writer) *cobra.Command {
 	root := &cobra.Command{
 		Use:           "firety",
-		Short:         "Test and compare reusable agent capabilities across tools",
-		Long:          "Firety is an open-source CLI for testing and comparing reusable agent capabilities such as Skills, MCP servers, and agent integrations across multiple tools.",
+		Short:         "Lint local SKILL.md packages",
+		Long:          "Firety is a lightweight open-source CLI for linting local SKILL.md packages and their referenced resources.",
 		SilenceUsage:  true,
 		SilenceErrors: true,
 		CompletionOptions: cobra.CompletionOptions{
@@ -23,19 +23,24 @@ func NewRootCommand(application *app.App, stdout, stderr io.Writer) *cobra.Comma
 	root.SetErr(stderr)
 
 	root.AddCommand(
-		newArtifactCommand(),
-		newBenchmarkCommand(application),
-		newEvidenceCommand(application),
-		newFreshnessCommand(),
-		newPublishCommand(application),
-		newProvenanceCommand(),
-		newReadinessCommand(application),
 		newSkillCommand(application),
-		newWorkspaceCommand(application),
-		newMCPCommand(application),
-		newAgentCommand(application),
-		newVersionCommand(application),
+		hideCommand(newArtifactCommand()),
+		hideCommand(newBenchmarkCommand(application)),
+		hideCommand(newEvidenceCommand(application)),
+		hideCommand(newFreshnessCommand()),
+		hideCommand(newPublishCommand(application)),
+		hideCommand(newProvenanceCommand()),
+		hideCommand(newReadinessCommand(application)),
+		hideCommand(newWorkspaceCommand(application)),
+		hideCommand(newMCPCommand(application)),
+		hideCommand(newAgentCommand(application)),
+		hideCommand(newVersionCommand(application)),
 	)
 
 	return root
+}
+
+func hideCommand(cmd *cobra.Command) *cobra.Command {
+	cmd.Hidden = true
+	return cmd
 }

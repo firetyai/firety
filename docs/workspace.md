@@ -1,5 +1,7 @@
 # Firety Workspace Workflows
 
+This command surface is currently experimental and hidden from default help.
+
 Firety workspace mode extends the existing single-skill engines to repositories that contain multiple local skills.
 
 The first version is intentionally conservative:

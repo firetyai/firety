@@ -41,27 +41,49 @@ type skillRulesOptions struct {
 
 func newSkillCommand(application *app.App) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "skill",
-		Short: "Work with reusable skills",
-		Long:  "Inspect and validate reusable skill directories.",
-		Args:  cobra.NoArgs,
-		RunE: func(cmd *cobra.Command, _ []string) error {
-			return cmd.Help()
+		Use:   "skill [path]",
+		Short: "Lint a local skill package",
+		Long:  "Lint a local skill package by checking SKILL.md and referenced local resources.",
+		Args:  cobra.MaximumNArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			target := "."
+			if len(args) == 1 {
+				target = args[0]
+			}
+
+			report, err := application.Services.SkillLint.LintWithProfileAndStrictness(target, service.SkillLintProfileGeneric, lint.StrictnessDefault)
+			if err != nil {
+				return newExitError(ExitCodeRuntime, err)
+			}
+
+			options := skillLintOptions{
+				format:     skillLintFormatText,
+				failOn:     skillLintFailOnErrors,
+				profile:    string(service.SkillLintProfileGeneric),
+				strictness: string(lint.StrictnessDefault),
+			}
+			if err := writeSkillLintReport(cmd.OutOrStdout(), report, service.SkillFixResult{}, options); err != nil {
+				return newExitError(ExitCodeRuntime, err)
+			}
+			if shouldFailSkillLint(report, options.failOn) {
+				return newExitError(ExitCodeLint, nil)
+			}
+			return nil
 		},
 	}
 
 	cmd.AddCommand(newSkillLintCommand(application))
-	cmd.AddCommand(newSkillAttestCommand(application))
-	cmd.AddCommand(newSkillBaselineCommand(application))
-	cmd.AddCommand(newSkillCompatibilityCommand(application))
-	cmd.AddCommand(newSkillPlanCommand(application))
-	cmd.AddCommand(newSkillAnalyzeCommand(application))
-	cmd.AddCommand(newSkillEvalCommand(application))
-	cmd.AddCommand(newSkillEvalCompareCommand(application))
-	cmd.AddCommand(newSkillGateCommand(application))
-	cmd.AddCommand(newSkillCompareCommand(application))
-	cmd.AddCommand(newSkillRenderCommand())
-	cmd.AddCommand(newSkillRulesCommand())
+	cmd.AddCommand(hideCommand(newSkillAttestCommand(application)))
+	cmd.AddCommand(hideCommand(newSkillBaselineCommand(application)))
+	cmd.AddCommand(hideCommand(newSkillCompatibilityCommand(application)))
+	cmd.AddCommand(hideCommand(newSkillPlanCommand(application)))
+	cmd.AddCommand(hideCommand(newSkillAnalyzeCommand(application)))
+	cmd.AddCommand(hideCommand(newSkillEvalCommand(application)))
+	cmd.AddCommand(hideCommand(newSkillEvalCompareCommand(application)))
+	cmd.AddCommand(hideCommand(newSkillGateCommand(application)))
+	cmd.AddCommand(hideCommand(newSkillCompareCommand(application)))
+	cmd.AddCommand(hideCommand(newSkillRenderCommand()))
+	cmd.AddCommand(hideCommand(newSkillRulesCommand()))
 
 	return cmd
 }

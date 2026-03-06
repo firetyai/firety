@@ -33,7 +33,7 @@ func TestRootCommandHelp(t *testing.T) {
 		t.Fatalf("expected empty stderr, got %q", stderr)
 	}
 
-	for _, expected := range []string{"artifact", "benchmark", "skill", "mcp", "agent", "version"} {
+	for _, expected := range []string{"artifact", "benchmark", "evidence", "skill", "mcp", "agent", "version"} {
 		if !strings.Contains(stdout, expected) {
 			t.Fatalf("expected help output to contain %q, got %q", expected, stdout)
 		}

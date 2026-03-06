@@ -31,6 +31,7 @@ firety artifact compare <base-artifact> <candidate-artifact>
 firety skill rules
 firety benchmark run
 firety benchmark render <artifact>
+firety evidence pack [path]
 firety mcp
 firety agent
 firety version
@@ -132,6 +133,8 @@ firety skill render ./plan-artifact.json --render full-report
 firety artifact inspect ./analysis-artifact.json
 firety artifact render ./analysis-artifact.json --render pr-comment
 firety artifact compare ./before-lint.json ./after-lint.json
+firety evidence pack ./path/to/skill --output ./evidence-pack
+firety evidence pack --input-artifact ./analysis-artifact.json --output ./evidence-pack
 firety benchmark run
 firety benchmark run --format json --artifact ./benchmark-artifact.json
 firety benchmark render ./benchmark-artifact.json --render ci-summary
@@ -171,9 +174,11 @@ The rule catalog is also a first-class product surface:
 - `firety artifact inspect <artifact>` validates a saved artifact and explains what it represents
 - `firety artifact render <artifact> --render pr-comment|ci-summary|full-report` renders a saved artifact without using the original live command path
 - `firety artifact compare <base-artifact> <candidate-artifact>` compares compatible saved artifacts without rerunning analysis
+- `firety evidence pack [path] --output <dir>` packages Firety artifacts and rendered summaries into a deterministic review bundle
 - `firety benchmark run` turns Firety's built-in benchmark corpus into a structured maintainer/public quality summary
 - `firety benchmark render <artifact> --render pr-comment|ci-summary|full-report` renders saved benchmark artifacts without rerunning the corpus
 - artifact-first workflows are documented in [docs/artifacts.md](docs/artifacts.md)
+- evidence-pack workflows are documented in [docs/evidence-packs.md](docs/evidence-packs.md)
 - dedicated rule documentation lives in [docs/lint-rules.md](docs/lint-rules.md)
 - the versioned lint artifact format is documented in [docs/lint-artifact.md](docs/lint-artifact.md)
 - routing eval behavior and the local suite/runner format are documented in [docs/skill-eval.md](docs/skill-eval.md)
@@ -220,6 +225,13 @@ Artifact workflows:
 - `firety artifact render` produces the same reviewer-facing report styles from saved artifacts without rerunning analysis
 - `firety artifact compare` currently supports lint artifacts, single-backend eval artifacts, and multi-backend eval artifacts
 - artifact workflows fail clearly on unsupported schema versions, unsupported artifact kinds, or incompatible compare pairs
+
+Evidence packs:
+
+- `firety evidence pack [path] --output <dir>` builds a deterministic directory bundle with `manifest.json`, `SUMMARY.md`, packaged artifacts, and rendered reports
+- `--input-artifact <path>` lets Firety assemble a pack from existing saved artifacts without rerunning analysis
+- fresh packs always include lint evidence and can also include eval, plan, compatibility, and gate evidence when explicitly requested
+- the first version is directory-first and intentionally avoids a more complex archive or publishing system
 
 Benchmark reporting:
 

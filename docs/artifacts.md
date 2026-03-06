@@ -2,6 +2,8 @@
 
 Firety artifacts are first-class saved outputs. They are meant to support offline review, CI summaries, PR comments, debugging, and later hosted/reporting flows without rerunning analysis.
 
+For a higher-level shareable bundle built from those artifacts, see [docs/evidence-packs.md](evidence-packs.md).
+
 ## Commands
 
 Inspect an artifact:

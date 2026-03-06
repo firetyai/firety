@@ -22,6 +22,7 @@ type Services struct {
 	SkillReadiness     service.SkillReadinessService
 	SkillBaseline      service.SkillBaselineService
 	SkillAttest        service.SkillAttestService
+	Workspace          service.WorkspaceService
 	Benchmark          service.BenchmarkService
 }
 
@@ -56,6 +57,7 @@ func New(version VersionInfo) *App {
 			SkillReadiness:     skillReadiness,
 			SkillBaseline:      service.NewSkillBaselineService(skillLint, skillEval),
 			SkillAttest:        skillAttest,
+			Workspace:          service.NewWorkspaceService(skillLint, skillReadiness),
 			Benchmark:          service.NewBenchmarkService(skillLint),
 		},
 	}

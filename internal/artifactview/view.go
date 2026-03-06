@@ -246,6 +246,12 @@ func load(path string) (loadedArtifact, error) {
 			return loadedArtifact{}, err
 		}
 		return loadedArtifact{Path: path, Value: value, Inspect: inspectSkillReadiness(path, value)}, nil
+	case "firety.workspace-report":
+		var value artifact.WorkspaceReportArtifact
+		if err := json.Unmarshal(data, &value); err != nil {
+			return loadedArtifact{}, err
+		}
+		return loadedArtifact{Path: path, Value: value, Inspect: inspectWorkspaceReport(path, value)}, nil
 	case "firety.benchmark-report":
 		var value artifact.BenchmarkArtifact
 		if err := json.Unmarshal(data, &value); err != nil {
@@ -441,6 +447,19 @@ func inspectSkillReadiness(path string, value artifact.SkillReadinessArtifact) I
 		Target:               firstNonEmpty(value.Run.Target, value.Readiness.Target),
 		Summary:              value.Readiness.Summary,
 		Context:              nonEmptyStrings(fmt.Sprintf("context %s", value.Readiness.PublishContext), fmt.Sprintf("decision %s", value.Readiness.Decision)),
+		SupportedRenderModes: renderModes(),
+	}
+}
+
+func inspectWorkspaceReport(path string, value artifact.WorkspaceReportArtifact) Inspection {
+	return Inspection{
+		Path:                 path,
+		ArtifactType:         value.ArtifactType,
+		SchemaVersion:        value.SchemaVersion,
+		Origin:               "firety workspace report",
+		Target:               value.Report.WorkspaceRoot,
+		Summary:              fmt.Sprintf("%d skill(s), %d workspace blocker(s), %d top priority item(s).", value.Report.Summary.SkillCount, len(value.Report.Summary.WorkspaceBlockers), len(value.Report.Summary.TopPriorities)),
+		Context:              nonEmptyStrings(fmt.Sprintf("profile %s", value.Run.Profile), fmt.Sprintf("strictness %s", value.Run.Strictness), fmt.Sprintf("context %s", value.Run.PublishContext)),
 		SupportedRenderModes: renderModes(),
 	}
 }

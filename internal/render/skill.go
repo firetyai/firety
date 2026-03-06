@@ -65,6 +65,12 @@ func RenderArtifact(path string, mode Mode) (string, error) {
 			return "", err
 		}
 		return renderReadinessArtifact(path, value, mode), nil
+	case "firety.workspace-report":
+		var value artifact.WorkspaceReportArtifact
+		if err := json.Unmarshal(data, &value); err != nil {
+			return "", err
+		}
+		return renderWorkspaceReportArtifact(path, value, mode), nil
 	case "firety.skill-baseline":
 		var value artifact.SkillBaselineSnapshotArtifact
 		if err := json.Unmarshal(data, &value); err != nil {
@@ -254,6 +260,47 @@ func renderReadinessArtifact(path string, value artifact.SkillReadinessArtifact,
 		writeSectionHeader(&b, mode, "Publish surfaces")
 		writeBullet(&b, fmt.Sprintf("Attestation: %s", value.Readiness.AttestationSuitability.Summary))
 		writeBullet(&b, fmt.Sprintf("Trust report: %s", value.Readiness.TrustReportSuitability.Summary))
+		writeLine(&b, fmt.Sprintf("Artifact: %s", path))
+	}
+	return strings.TrimSpace(b.String()) + "\n"
+}
+
+func renderWorkspaceReportArtifact(path string, value artifact.WorkspaceReportArtifact, mode Mode) string {
+	var b strings.Builder
+	writeTitle(&b, mode, "Firety Workspace Report")
+	writeLine(&b, fmt.Sprintf("Workspace: %s", value.Report.WorkspaceRoot))
+	writeLine(&b, fmt.Sprintf("Skills: %d", value.Report.Summary.SkillCount))
+	writeLine(&b, fmt.Sprintf("Lint totals: %d error(s), %d warning(s)", value.Report.Summary.TotalLintErrors, value.Report.Summary.TotalLintWarnings))
+	if value.Report.Gate != nil {
+		writeLine(&b, fmt.Sprintf("Workspace gate: %s", strings.ToUpper(string(value.Report.Gate.Decision))))
+	}
+	writeLine(&b, fmt.Sprintf("Readiness: ready=%d, caveats=%d, not-ready=%d, insufficient=%d",
+		value.Report.Summary.ReadySkills,
+		value.Report.Summary.ReadyWithCaveatsSkills,
+		value.Report.Summary.NotReadySkills,
+		value.Report.Summary.InsufficientEvidenceSkills,
+	))
+	if len(value.Report.Summary.WorkspaceBlockers) > 0 {
+		writeSectionHeader(&b, mode, "Review first")
+		for _, item := range firstStrings(value.Report.Summary.WorkspaceBlockers, 3) {
+			writeBullet(&b, item)
+		}
+	}
+	if mode != ModePRComment && len(value.Report.Summary.TopPriorities) > 0 {
+		writeSectionHeader(&b, mode, "Top priorities")
+		for _, item := range firstStrings(value.Report.Summary.TopPriorities, 5) {
+			writeBullet(&b, item)
+		}
+	}
+	if mode == ModeFullReport {
+		writeSectionHeader(&b, mode, "Per skill")
+		for _, skill := range value.Report.Skills {
+			summary := skill.Lint.Summary
+			if skill.Readiness != nil {
+				summary = fmt.Sprintf("%s; readiness=%s", summary, skill.Readiness.Decision)
+			}
+			writeBullet(&b, fmt.Sprintf("%s: %s", skill.Skill.Name, summary))
+		}
 		writeLine(&b, fmt.Sprintf("Artifact: %s", path))
 	}
 	return strings.TrimSpace(b.String()) + "\n"

@@ -35,6 +35,10 @@ firety benchmark render <artifact>
 firety evidence pack [path]
 firety publish report [path]
 firety readiness check [path]
+firety workspace lint [path]
+firety workspace readiness [path]
+firety workspace gate [path]
+firety workspace report [path]
 firety mcp
 firety agent
 firety version
@@ -152,6 +156,10 @@ firety publish report ./path/to/skill --output ./trust-report --runner ./routing
 firety publish report --input-pack ./evidence-pack --output ./trust-report
 firety readiness check ./path/to/skill --context merge --runner ./routing-runner
 firety readiness check --context public-attestation --input-pack ./evidence-pack
+firety workspace lint ./path/to/repo
+firety workspace readiness ./path/to/repo --context merge
+firety workspace gate ./path/to/repo --context public-release
+firety workspace report ./path/to/repo --artifact ./workspace-report.json
 firety benchmark run
 firety benchmark run --format json --artifact ./benchmark-artifact.json
 firety benchmark render ./benchmark-artifact.json --render ci-summary
@@ -198,6 +206,7 @@ The rule catalog is also a first-class product surface:
 - `firety artifact compare <base-artifact> <candidate-artifact>` compares compatible saved artifacts without rerunning analysis
 - `firety evidence pack [path] --output <dir>` packages Firety artifacts and rendered summaries into a deterministic review bundle
 - `firety publish report [path] --output <dir>` turns Firety evidence into a static publishable trust-report bundle
+- `firety workspace lint|readiness|gate|report [path]` discovers all local `SKILL.md` directories under a repository and produces an aggregate workspace summary plus per-skill drilldown
 - `firety benchmark run` turns Firety's built-in benchmark corpus into a structured maintainer/public quality summary
 - `firety benchmark render <artifact> --render pr-comment|ci-summary|full-report` renders saved benchmark artifacts without rerunning the corpus
 - artifact-first workflows are documented in [docs/artifacts.md](docs/artifacts.md)
@@ -214,6 +223,7 @@ The rule catalog is also a first-class product surface:
 - compatibility workflows are documented in [docs/compatibility.md](docs/compatibility.md)
 - quality gate behavior is documented in [docs/quality-gate.md](docs/quality-gate.md)
 - benchmark reporting is documented in [docs/benchmark-reporting.md](docs/benchmark-reporting.md)
+- workspace workflows are documented in [docs/workspace.md](docs/workspace.md)
 - Firety also maintains a curated benchmark corpus and regression suite to protect lint quality over time
 
 Autofix philosophy:

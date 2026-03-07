@@ -109,7 +109,24 @@ jobs:
           registry-url: https://registry.npmjs.org
 
       - name: Set npm package version from tag
-        run: npm version --no-git-tag-version "${GITHUB_REF_NAME#v}"
+        env:
+          RELEASE_VERSION: ${{ github.ref_name }}
+        run: |
+          node <<'EOF'
+          const fs = require("node:fs");
+
+          const version = process.env.RELEASE_VERSION.replace(/^v/, "");
+          const packagePath = "package.json";
+          const packageJSON = JSON.parse(fs.readFileSync(packagePath, "utf8"));
+
+          if (packageJSON.version !== version) {
+            packageJSON.version = version;
+            fs.writeFileSync(
+              packagePath,
+              `${JSON.stringify(packageJSON, null, 2)}\n`
+            );
+          }
+          EOF
 
       - name: Publish npm package
         run: npm publish --access public --provenance

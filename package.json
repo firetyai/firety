@@ -1,0 +1,39 @@
+{
+  "name": "firety",
+  "version": "0.0.1",
+  "description": "Lightweight CLI for linting local SKILL.md packages.",
+  "license": "MIT",
+  "homepage": "https://github.com/firetyai/firety",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/firetyai/firety.git"
+  },
+  "bugs": {
+    "url": "https://github.com/firetyai/firety/issues"
+  },
+  "type": "module",
+  "bin": {
+    "firety": "npm/firety.js"
+  },
+  "files": [
+    "npm/",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "postinstall": "node ./npm/postinstall.mjs",
+    "package-check": "npm pack --dry-run"
+  },
+  "keywords": [
+    "cli",
+    "lint",
+    "skills",
+    "markdown"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}

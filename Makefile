@@ -10,7 +10,7 @@ LDFLAGS := -s -w \
 	-X github.com/firety/firety/internal/platform/buildinfo.commit=$(COMMIT) \
 	-X github.com/firety/firety/internal/platform/buildinfo.date=$(DATE)
 
-.PHONY: build fmt fmt-check lint test coverage test-race tidy precommit ci rules-docs
+.PHONY: build fmt fmt-check lint test coverage test-race tidy precommit ci rules-docs package-check
 
 build:
 	mkdir -p bin
@@ -38,9 +38,12 @@ test-race:
 tidy:
 	$(GO) mod tidy
 
-precommit: fmt lint test
+package-check:
+	npm pack --dry-run >/dev/null
 
-ci: fmt-check lint test test-race build
+precommit: fmt lint test package-check
+
+ci: fmt-check lint test test-race build package-check
 
 rules-docs:
 	mkdir -p docs

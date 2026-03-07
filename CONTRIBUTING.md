@@ -82,3 +82,20 @@ Before submitting a PR:
 3. Update documentation when the architecture or developer workflow changes.
 
 Small, focused PRs are strongly preferred.
+
+## Releasing
+
+The npm package and GitHub release are tied together.
+
+Release flow:
+
+1. Push a tag in the form `vX.Y.Z`.
+2. GitHub Actions builds release binaries for supported platforms.
+3. The workflow publishes a GitHub release with those binaries.
+4. The workflow publishes the npm package `firety`.
+
+Required secret:
+
+- `NPM_TOKEN` for npm publish
+
+The npm package is a thin wrapper that downloads the matching GitHub release binary during install, so the GitHub release must publish successfully before npm publish runs.

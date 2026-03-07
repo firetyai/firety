@@ -1,2 +1,5 @@
 /bin/
 /coverage.out
+/node_modules/
+/npm/dist/
+/*.tgz

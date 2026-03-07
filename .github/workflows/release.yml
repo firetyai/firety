@@ -1,0 +1,117 @@
+name: release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  build-binaries:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - goos: linux
+            goarch: amd64
+            asset_ext: ""
+          - goos: linux
+            goarch: arm64
+            asset_ext: ""
+          - goos: darwin
+            goarch: amd64
+            asset_ext: ""
+          - goos: darwin
+            goarch: arm64
+            asset_ext: ""
+          - goos: windows
+            goarch: amd64
+            asset_ext: ".exe"
+          - goos: windows
+            goarch: arm64
+            asset_ext: ".exe"
+
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - name: Build release binary
+        env:
+          VERSION: ${{ github.ref_name }}
+          GOOS: ${{ matrix.goos }}
+          GOARCH: ${{ matrix.goarch }}
+          ASSET_EXT: ${{ matrix.asset_ext }}
+        run: |
+          set -euo pipefail
+          VERSION="${VERSION#v}"
+          mkdir -p dist
+          OUTPUT="dist/firety_${VERSION}_${GOOS}_${GOARCH}${ASSET_EXT}"
+          CGO_ENABLED=0 go build \
+            -ldflags "-s -w -X github.com/firety/firety/internal/platform/buildinfo.version=${VERSION} -X github.com/firety/firety/internal/platform/buildinfo.commit=${GITHUB_SHA::7} -X github.com/firety/firety/internal/platform/buildinfo.date=$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+            -o "${OUTPUT}" \
+            ./cmd/firety
+
+      - name: Upload release binaries
+        uses: actions/upload-artifact@v4
+        with:
+          name: firety-${{ matrix.goos }}-${{ matrix.goarch }}
+          path: dist/*
+
+  publish-github-release:
+    runs-on: ubuntu-latest
+    needs: build-binaries
+    permissions:
+      contents: write
+
+    steps:
+      - name: Download release binaries
+        uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+
+      - name: Generate checksums
+        run: |
+          cd dist
+          sha256sum * > SHA256SUMS.txt
+
+      - name: Publish GitHub release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: firety ${{ github.ref_name }}
+          generate_release_notes: true
+          files: |
+            dist/*
+
+  publish-npm:
+    runs-on: ubuntu-latest
+    needs: publish-github-release
+    permissions:
+      contents: read
+      id-token: write
+
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          registry-url: https://registry.npmjs.org
+
+      - name: Set npm package version from tag
+        run: npm version --no-git-tag-version "${GITHUB_REF_NAME#v}"
+
+      - name: Publish npm package
+        run: npm publish --access public --provenance
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

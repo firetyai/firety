@@ -11,6 +11,12 @@ It checks a skill directory as a package, not just a single markdown file:
 
 ## Quickstart
 
+Install from npm:
+
+```bash
+npm install -g firety
+```
+
 Lint the current directory:
 
 ```bash
@@ -86,3 +92,11 @@ Those paths remain in the codebase for ongoing iteration, but they are not the p
 The main lint artifact format is documented in [docs/lint-artifact.md](/Users/marian2js/workspace/firety/firety/docs/lint-artifact.md).
 
 Everything else in `docs/` should be read as experimental or internal-facing unless it directly supports `firety skill lint`.
+
+## Release packaging
+
+The repo also includes the packaging needed to publish `firety` to npm as a thin wrapper around the official GitHub release binaries.
+
+- GitHub tag releases publish platform binaries first
+- the same release workflow then publishes the npm package `firety`
+- npm installs download the matching release binary for the current platform during `postinstall`

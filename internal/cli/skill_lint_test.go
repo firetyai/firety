@@ -625,8 +625,8 @@ func TestSkillLintCommandDoesNotRewriteFilesWithoutFix(t *testing.T) {
 	if err != nil {
 		t.Fatalf("expected no runtime error, got %v", err)
 	}
-	if code != cli.ExitCodeLint {
-		t.Fatalf("expected exit code %d, got %d", cli.ExitCodeLint, code)
+	if code != cli.ExitCodeOK {
+		t.Fatalf("expected exit code %d, got %d", cli.ExitCodeOK, code)
 	}
 
 	content, err := os.ReadFile(filepath.Join(root, "SKILL.md"))
@@ -775,23 +775,15 @@ func TestSkillLintCommandWarningsStillExitZero(t *testing.T) {
 		t.Fatalf("expected warning output, got %q", stdout)
 	}
 
-	if !strings.Contains(stdout, "WARNING [skill.missing-examples]") {
-		t.Fatalf("expected examples warning output, got %q", stdout)
-	}
-
 	if !strings.Contains(stdout, "WARNING [skill.missing-when-to-use]") {
 		t.Fatalf("expected when-to-use warning output, got %q", stdout)
-	}
-
-	if !strings.Contains(stdout, "WARNING [skill.missing-negative-guidance]") {
-		t.Fatalf("expected negative-guidance warning output, got %q", stdout)
 	}
 
 	if !strings.Contains(stdout, "WARNING [skill.missing-usage-guidance]") {
 		t.Fatalf("expected usage warning output, got %q", stdout)
 	}
 
-	if !strings.Contains(stdout, "Summary: 0 error(s), 5 warning(s)") {
+	if !strings.Contains(stdout, "Summary: 0 error(s), 3 warning(s)") {
 		t.Fatalf("expected summary output, got %q", stdout)
 	}
 }
@@ -894,10 +886,6 @@ func TestSkillLintCommandJSONExplainOutputIncludesGuidance(t *testing.T) {
 	root := t.TempDir()
 	testutil.WriteFiles(t, root, map[string]string{
 		"SKILL.md": strings.Join([]string{
-			"---",
-			"name: Example Skill",
-			"description: Validates local skill directories before publishing them.",
-			"---",
 			"## When To Use",
 			"",
 			"Use this skill when you need to validate a local skill directory before publishing changes.",
@@ -976,7 +964,7 @@ func TestSkillLintCommandJSONExplainOutputIncludesProfileGuidance(t *testing.T) 
 				"Helps validate local skills with portable instructions.",
 				[]string{"Run this in Codex with slash commands when the user asks for validation help."},
 			),
-			expectedRuleID:  "skill.mixed-ecosystem-guidance",
+			expectedRuleID:  "skill.profile-incompatible-guidance",
 			expectedHint:    "For the Claude Code profile",
 			expectedPosture: "ambiguous",
 		},
@@ -1000,7 +988,7 @@ func TestSkillLintCommandJSONExplainOutputIncludesProfileGuidance(t *testing.T) 
 				"Helps validate local skills with portable instructions.",
 				[]string{"Run this in Codex with slash commands when the user asks for validation help."},
 			),
-			expectedRuleID:  "skill.mixed-ecosystem-guidance",
+			expectedRuleID:  "skill.profile-incompatible-guidance",
 			expectedHint:    "For the Cursor profile",
 			expectedPosture: "ambiguous",
 		},
@@ -1106,7 +1094,7 @@ func TestSkillLintCommandJSONOutputIncludesUsabilityFindings(t *testing.T) {
 		}, "\n"),
 	})
 
-	stdout, stderr, code, err := executeSkillLint(t, root, "--format", "json")
+	stdout, stderr, code, err := executeSkillLint(t, root, "--format", "json", "--strictness", "strict")
 	if err != nil {
 		t.Fatalf("expected no runtime error, got %v", err)
 	}
@@ -1202,7 +1190,7 @@ func TestSkillLintCommandJSONOutputIncludesBundleFindings(t *testing.T) {
 		t.Fatalf("write shared resource: %v", err)
 	}
 
-	stdout, stderr, code, err := executeSkillLint(t, root, "--format", "json")
+	stdout, stderr, code, err := executeSkillLint(t, root, "--format", "json", "--strictness", "strict")
 	if err != nil {
 		t.Fatalf("expected no runtime error, got %v", err)
 	}
@@ -1237,7 +1225,7 @@ func TestSkillLintCommandJSONOutputIncludesCostAwareFindings(t *testing.T) {
 		"docs/playbook.md": strings.Repeat("Playbook guidance for validating a skill bundle before publishing it safely. ", 130),
 	})
 
-	stdout, stderr, code, err := executeSkillLint(t, root, "--format", "json")
+	stdout, stderr, code, err := executeSkillLint(t, root, "--format", "json", "--strictness", "strict")
 	if err != nil {
 		t.Fatalf("expected no runtime error, got %v", err)
 	}
@@ -1386,7 +1374,7 @@ func TestSkillLintCommandSARIFOutput(t *testing.T) {
 		"SKILL.md": brokenLinkSkillContent(),
 	})
 
-	stdout, stderr, code, err := executeSkillLint(t, root, "--format", "sarif")
+	stdout, stderr, code, err := executeSkillLint(t, root, "--format", "sarif", "--strictness", "strict")
 	if err != nil {
 		t.Fatalf("expected no runtime error, got %v", err)
 	}
@@ -1427,8 +1415,8 @@ func TestSkillLintCommandSARIFOutput(t *testing.T) {
 		}
 	}
 
-	if len(run.Results) != 1 {
-		t.Fatalf("expected one result, got %#v", run.Results)
+	if len(run.Results) == 0 {
+		t.Fatalf("expected at least one result, got %#v", run.Results)
 	}
 
 	result := run.Results[0]
@@ -1489,7 +1477,7 @@ func TestSkillLintCommandSARIFOutputIncludesUsabilityFindings(t *testing.T) {
 		}, "\n"),
 	})
 
-	stdout, stderr, code, err := executeSkillLint(t, root, "--format", "sarif")
+	stdout, stderr, code, err := executeSkillLint(t, root, "--format", "sarif", "--strictness", "strict")
 	if err != nil {
 		t.Fatalf("expected no runtime error, got %v", err)
 	}
@@ -1600,7 +1588,7 @@ func TestSkillLintCommandSARIFOutputIncludesBundleFindings(t *testing.T) {
 		"scripts/check.sh": "",
 	})
 
-	stdout, stderr, code, err := executeSkillLint(t, root, "--format", "sarif")
+	stdout, stderr, code, err := executeSkillLint(t, root, "--format", "sarif", "--strictness", "strict")
 	if err != nil {
 		t.Fatalf("expected no runtime error, got %v", err)
 	}
@@ -1637,7 +1625,7 @@ func TestSkillLintCommandSARIFOutputIncludesCostAwareFindings(t *testing.T) {
 		),
 	})
 
-	stdout, stderr, code, err := executeSkillLint(t, root, "--format", "sarif")
+	stdout, stderr, code, err := executeSkillLint(t, root, "--format", "sarif", "--strictness", "strict")
 	if err != nil {
 		t.Fatalf("expected no runtime error, got %v", err)
 	}
@@ -2073,8 +2061,6 @@ func TestSkillLintCommandJSONOutputOrdering(t *testing.T) {
 		"skill.reference-outside-root",
 		"skill.duplicate-heading",
 		"skill.missing-when-to-use",
-		"skill.missing-negative-guidance",
-		"skill.missing-examples",
 		"skill.missing-usage-guidance",
 		"skill.suspicious-relative-path",
 	}
@@ -2126,8 +2112,6 @@ func TestSkillLintCommandSARIFOutputOrdering(t *testing.T) {
 		"skill.reference-outside-root",
 		"skill.duplicate-heading",
 		"skill.missing-when-to-use",
-		"skill.missing-negative-guidance",
-		"skill.missing-examples",
 		"skill.missing-usage-guidance",
 		"skill.suspicious-relative-path",
 	}

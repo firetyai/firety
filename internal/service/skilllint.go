@@ -789,7 +789,7 @@ func checkFrontMatterDescriptionQuality(report *lint.Report, doc skillDocument, 
 		report.AddWarning(lint.RuleShortFrontMatterDescription, `front matter field "description" is too short to be useful`, skillFileName, line)
 	}
 
-	if len([]rune(description)) > longDescriptionThresholdFor(strictness) {
+	if strictness != lint.StrictnessDefault && len([]rune(description)) > longDescriptionThresholdFor(strictness) {
 		report.AddWarning(lint.RuleLongFrontMatterDescription, `front matter field "description" is excessively long`, skillFileName, line)
 	}
 
@@ -856,7 +856,7 @@ func checkTriggerQuality(report *lint.Report, doc skillDocument, _ SkillLintProf
 }
 
 func checkTopLevelTitle(report *lint.Report, doc skillDocument, _ SkillLintProfile, _ lint.Strictness) {
-	if doc.hasTitle {
+	if doc.hasTitle || doc.frontMatter.Name != "" {
 		return
 	}
 
@@ -929,7 +929,11 @@ func checkBundleReferences(report *lint.Report, doc skillDocument, _ SkillLintPr
 	}
 }
 
-func checkMentionedResources(report *lint.Report, doc skillDocument, _ SkillLintProfile, _ lint.Strictness) {
+func checkMentionedResources(report *lint.Report, doc skillDocument, _ SkillLintProfile, strictness lint.Strictness) {
+	if strictness == lint.StrictnessDefault {
+		return
+	}
+
 	linkedPaths := make(map[string]struct{}, len(doc.links))
 	for _, link := range doc.links {
 		if !isLocalLink(link.Destination) {
@@ -979,6 +983,10 @@ func checkBundleStructure(report *lint.Report, doc skillDocument, _ SkillLintPro
 }
 
 func checkCostEfficiency(report *lint.Report, doc skillDocument, _ SkillLintProfile, strictness lint.Strictness) {
+	if strictness == lint.StrictnessDefault {
+		return
+	}
+
 	skillTokens := estimateTokenCount(doc.content)
 	if skillTokens >= largeSkillTokenThresholdFor(strictness) {
 		report.AddWarning(
@@ -1127,6 +1135,10 @@ func checkWhenToUseGuidance(report *lint.Report, doc skillDocument, _ SkillLintP
 }
 
 func checkNegativeGuidance(report *lint.Report, doc skillDocument, _ SkillLintProfile, strictness lint.Strictness) {
+	if strictness == lint.StrictnessDefault {
+		return
+	}
+
 	if section, ok := findSection(doc, isNegativeGuidanceHeading); ok {
 		if isWeakNegativeGuidanceText(joinSectionText(section), strictness) {
 			report.AddWarning(lint.RuleWeakNegativeGuidance, "negative guidance exists but appears too weak or generic", skillFileName, section.Heading.Line)
@@ -1148,7 +1160,9 @@ func checkNegativeGuidance(report *lint.Report, doc skillDocument, _ SkillLintPr
 func checkExamplesSection(report *lint.Report, doc skillDocument, _ SkillLintProfile, strictness lint.Strictness) {
 	examples := inspectExamples(doc, strictness)
 	if !examples.Present {
-		report.AddWarning(lint.RuleMissingExamples, "no obvious examples section or usage examples found", skillFileName, 0)
+		if strictness != lint.StrictnessDefault {
+			report.AddWarning(lint.RuleMissingExamples, "no obvious examples section or usage examples found", skillFileName, 0)
+		}
 		return
 	}
 
@@ -1388,6 +1402,24 @@ func checkShortContent(report *lint.Report, doc skillDocument, _ SkillLintProfil
 }
 
 func hasWhenToUseGuidance(doc skillDocument) bool {
+	if doc.frontMatter.Description != "" {
+		lowerDescription := strings.ToLower(doc.frontMatter.Description)
+		for _, phrase := range []string{
+			"use this skill when",
+			"use when",
+			"trigger when",
+			"best for",
+			"ideal for",
+			"works best when",
+			"choose this skill when",
+			"good fit when",
+		} {
+			if strings.Contains(lowerDescription, phrase) {
+				return true
+			}
+		}
+	}
+
 	if _, ok := findSection(doc, isWhenToUseHeading); ok {
 		return true
 	}
@@ -1464,26 +1496,13 @@ func inspectExamples(doc skillDocument, strictness lint.Strictness) exampleInspe
 		return inspection
 	}
 
-	if doc.hasCodeFence {
+	if hasInlineExampleSignals(doc.bodyLines) {
 		text := lowerJoinedBodyText(doc.bodyLines)
 		return exampleInspection{
 			Present:              true,
-			Weak:                 false,
-			Generic:              false,
-			HasInvocationPattern: hasExampleInvocationPattern(text),
-			Line:                 0,
-		}
-	}
-
-	lowerBody := strings.ToLower(doc.body)
-	if strings.Contains(lowerBody, "for example") ||
-		strings.Contains(lowerBody, "example:") ||
-		(strings.Contains(lowerBody, "input") && strings.Contains(lowerBody, "output")) {
-		return exampleInspection{
-			Present:              true,
 			Weak:                 true,
-			Generic:              isGenericExamplesText(lowerBody),
-			HasInvocationPattern: hasExampleInvocationPattern(lowerBody),
+			Generic:              isGenericExamplesText(text),
+			HasInvocationPattern: hasExampleInvocationPattern(text),
 			Line:                 0,
 		}
 	}
@@ -1492,6 +1511,15 @@ func inspectExamples(doc skillDocument, strictness lint.Strictness) exampleInspe
 }
 
 func hasInvocationGuidance(doc skillDocument) bool {
+	if doc.frontMatter.Description != "" {
+		lowerDescription := strings.ToLower(doc.frontMatter.Description)
+		if strings.Contains(lowerDescription, "user asks to") ||
+			strings.Contains(lowerDescription, "the user asks to") ||
+			strings.Contains(lowerDescription, "trigger when") {
+			return true
+		}
+	}
+
 	for _, heading := range doc.headings {
 		normalized := normalizeHeading(heading.Text)
 		if strings.Contains(normalized, "usage") ||
@@ -1519,8 +1547,34 @@ func hasInvocationGuidance(doc skillDocument) bool {
 		"arguments:",
 		"parameters:",
 		"pass ",
+		"the user provides",
+		"user provides",
+		"the user may include",
+		"user may include",
+		"user asks to",
 	} {
 		if strings.Contains(lowerBody, phrase) {
+			return true
+		}
+	}
+
+	return false
+}
+
+func hasInlineExampleSignals(lines []documentLine) bool {
+	for _, line := range lines {
+		lower := strings.ToLower(strings.TrimSpace(line.Trimmed))
+		if lower == "" {
+			continue
+		}
+
+		if strings.HasPrefix(lower, "example:") ||
+			strings.HasPrefix(lower, "request:") ||
+			strings.HasPrefix(lower, "prompt:") ||
+			strings.HasPrefix(lower, "input:") ||
+			strings.HasPrefix(lower, "output:") ||
+			strings.HasPrefix(lower, "result:") ||
+			strings.HasPrefix(lower, "invocation:") {
 			return true
 		}
 	}
@@ -2991,10 +3045,10 @@ func collectPortabilitySignals(text string) []portabilitySignal {
 	for _, candidate := range portabilityProfiles {
 		signal := portabilitySignal{profile: candidate.profile}
 
-		signal.hasBranding = lineContainsAny(lower, candidate.brandTerms)
+		signal.hasBranding = lineContainsBoundedAny(lower, candidate.brandTerms)
 		signal.hasInstallPath = lineContainsAny(lower, candidate.installMarkers)
-		signal.hasInvocationTerm = lineContainsAny(lower, candidate.invocationMarkers) ||
-			(lineContainsAny(lower, candidate.instructionMarkers) && lineContainsInstructionSignal(lower))
+		signal.hasInvocationTerm = lineContainsBoundedAny(lower, candidate.invocationMarkers) ||
+			(lineContainsBoundedAny(lower, candidate.instructionMarkers) && lineContainsInstructionSignal(lower))
 
 		if !signal.hasBranding && !signal.hasInstallPath && !signal.hasInvocationTerm {
 			continue
@@ -3069,6 +3123,47 @@ func lineContainsAny(text string, phrases []string) bool {
 	return false
 }
 
+func lineContainsBoundedAny(text string, phrases []string) bool {
+	for _, phrase := range phrases {
+		if containsBoundedPhrase(text, phrase) {
+			return true
+		}
+	}
+
+	return false
+}
+
+func containsBoundedPhrase(text, phrase string) bool {
+	if phrase == "" {
+		return false
+	}
+
+	start := 0
+	for {
+		index := strings.Index(text[start:], phrase)
+		if index < 0 {
+			return false
+		}
+
+		index += start
+		end := index + len(phrase)
+		if isBoundaryAt(text, index-1) && isBoundaryAt(text, end) {
+			return true
+		}
+
+		start = index + 1
+	}
+}
+
+func isBoundaryAt(text string, index int) bool {
+	if index < 0 || index >= len(text) {
+		return true
+	}
+
+	b := text[index]
+	return !((b >= 'a' && b <= 'z') || (b >= '0' && b <= '9'))
+}
+
 func profileDisplayName(profile SkillLintProfile) string {
 	for _, candidate := range portabilityProfiles {
 		if candidate.profile == profile {
@@ -3098,8 +3193,12 @@ func looksLikeLocalResourceMention(candidate string) bool {
 		return false
 	}
 
+	if strings.ContainsAny(trimmed, "*?[]{}()") {
+		return false
+	}
+
 	if strings.HasSuffix(trimmed, "/") {
-		return true
+		return !strings.Contains(trimmed, "//")
 	}
 
 	if strings.Contains(trimmed, "/") {
@@ -3107,7 +3206,33 @@ func looksLikeLocalResourceMention(candidate string) bool {
 	}
 
 	extension := strings.ToLower(filepath.Ext(trimmed))
-	return extension != "" && extension != "."
+	if extension == "" || extension == "." {
+		return false
+	}
+
+	if isCommonProjectFile(strings.ToLower(trimmed)) {
+		return false
+	}
+
+	return isKnownLocalResourceExtension(extension)
+}
+
+func isKnownLocalResourceExtension(extension string) bool {
+	switch extension {
+	case ".md", ".txt", ".json", ".yaml", ".yml", ".toml", ".py", ".sh", ".bash", ".zsh", ".js", ".jsx", ".ts", ".tsx", ".css", ".scss", ".html", ".svg", ".csv", ".pdf", ".sql":
+		return true
+	default:
+		return false
+	}
+}
+
+func isCommonProjectFile(candidate string) bool {
+	switch candidate {
+	case "package.json", "package-lock.json", "tsconfig.json", "jsconfig.json", "requirements.txt", "pyproject.toml", "setup.py", "pipfile", "go.mod", "go.sum", "gemfile", "pom.xml", "build.gradle", "build.gradle.kts", "build.sbt", "composer.json":
+		return true
+	default:
+		return false
+	}
 }
 
 func lookupBundleEntry(bundle bundleInventory, skillDir, targetPath string) (bundleEntry, bool) {

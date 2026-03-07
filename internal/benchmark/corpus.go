@@ -70,7 +70,6 @@ func SkillLintBenchmarkCorpus() []BenchmarkSkillFixture {
 			Files: map[string]string{
 				"SKILL.md": strings.Join([]string{
 					"---",
-					"name: Broken Skill",
 					"description: Validates a broken local skill bundle with enough context to isolate structural failures.",
 					"---",
 					"## When To Use",
@@ -104,9 +103,10 @@ func SkillLintBenchmarkCorpus() []BenchmarkSkillFixture {
 			},
 		},
 		{
-			Name:     "vague-generic-skill",
-			Intent:   "Generic helper-style skill with weak routing signals and little distinctiveness.",
-			Category: CategoryTriggerQuality,
+			Name:       "vague-generic-skill",
+			Intent:     "Generic helper-style skill with weak routing signals and little distinctiveness.",
+			Category:   CategoryTriggerQuality,
+			Strictness: "pedantic",
 			Files: map[string]string{
 				"SKILL.md": strings.Join([]string{
 					"---",
@@ -230,7 +230,7 @@ func SkillLintBenchmarkCorpus() []BenchmarkSkillFixture {
 				},
 				MinWarningCount:  2,
 				MaxErrorCount:    0,
-				RoutingRiskLevel: lint.RoutingRiskHigh,
+				RoutingRiskLevel: lint.RoutingRiskMedium,
 				RoutingRiskAreas: []string{"profile-fit"},
 			},
 		},
@@ -278,9 +278,10 @@ func SkillLintBenchmarkCorpus() []BenchmarkSkillFixture {
 			},
 		},
 		{
-			Name:     "cost-bloat-problem",
-			Intent:   "Skill with repetitive instructions, oversized examples, and a large referenced playbook.",
-			Category: CategoryCost,
+			Name:       "cost-bloat-problem",
+			Intent:     "Skill with repetitive instructions, oversized examples, and a large referenced playbook.",
+			Category:   CategoryCost,
+			Strictness: "pedantic",
 			Files: map[string]string{
 				"SKILL.md": costBloatBenchmarkSkill(),
 				"docs/playbook.md": strings.Repeat(

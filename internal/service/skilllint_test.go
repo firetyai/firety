@@ -173,7 +173,7 @@ func TestSkillLinterTargetErrors(t *testing.T) {
 			"SKILL.md": "   \n\t",
 		})
 
-		report, err := service.NewSkillLinter().Lint(root)
+		report, err := service.NewSkillLinter().LintWithProfileAndStrictness(root, service.SkillLintProfileGeneric, lint.StrictnessStrict)
 		if err != nil {
 			t.Fatalf("expected no error, got %v", err)
 		}
@@ -199,7 +199,7 @@ func TestSkillLinterFrontMatterValidation(t *testing.T) {
 			}, "\n"),
 		})
 
-		report, err := service.NewSkillLinter().Lint(root)
+		report, err := service.NewSkillLinter().LintWithProfileAndStrictness(root, service.SkillLintProfileGeneric, lint.StrictnessPedantic)
 		if err != nil {
 			t.Fatalf("expected no error, got %v", err)
 		}
@@ -220,7 +220,7 @@ func TestSkillLinterFrontMatterValidation(t *testing.T) {
 			}, "\n"),
 		})
 
-		report, err := service.NewSkillLinter().Lint(root)
+		report, err := service.NewSkillLinter().LintWithProfileAndStrictness(root, service.SkillLintProfileGeneric, lint.StrictnessPedantic)
 		if err != nil {
 			t.Fatalf("expected no error, got %v", err)
 		}
@@ -242,7 +242,7 @@ func TestSkillLinterFrontMatterValidation(t *testing.T) {
 			}, "\n"),
 		})
 
-		report, err := service.NewSkillLinter().Lint(root)
+		report, err := service.NewSkillLinter().LintWithProfileAndStrictness(root, service.SkillLintProfileGeneric, lint.StrictnessPedantic)
 		if err != nil {
 			t.Fatalf("expected no error, got %v", err)
 		}
@@ -263,7 +263,7 @@ func TestSkillLinterFrontMatterValidation(t *testing.T) {
 			}, "\n"),
 		})
 
-		report, err := service.NewSkillLinter().Lint(root)
+		report, err := service.NewSkillLinter().LintWithProfileAndStrictness(root, service.SkillLintProfileGeneric, lint.StrictnessStrict)
 		if err != nil {
 			t.Fatalf("expected no error, got %v", err)
 		}
@@ -285,7 +285,7 @@ func TestSkillLinterFrontMatterValidation(t *testing.T) {
 			}, "\n"),
 		})
 
-		report, err := service.NewSkillLinter().Lint(root)
+		report, err := service.NewSkillLinter().LintWithProfileAndStrictness(root, service.SkillLintProfileGeneric, lint.StrictnessPedantic)
 		if err != nil {
 			t.Fatalf("expected no error, got %v", err)
 		}
@@ -307,7 +307,7 @@ func TestSkillLinterFrontMatterValidation(t *testing.T) {
 			}, "\n"),
 		})
 
-		report, err := service.NewSkillLinter().Lint(root)
+		report, err := service.NewSkillLinter().LintWithProfileAndStrictness(root, service.SkillLintProfileGeneric, lint.StrictnessPedantic)
 		if err != nil {
 			t.Fatalf("expected no error, got %v", err)
 		}
@@ -329,7 +329,7 @@ func TestSkillLinterFrontMatterValidation(t *testing.T) {
 			}, "\n"),
 		})
 
-		report, err := service.NewSkillLinter().Lint(root)
+		report, err := service.NewSkillLinter().LintWithProfileAndStrictness(root, service.SkillLintProfileGeneric, lint.StrictnessPedantic)
 		if err != nil {
 			t.Fatalf("expected no error, got %v", err)
 		}
@@ -354,6 +354,29 @@ func TestSkillLinterFrontMatterValidation(t *testing.T) {
 		})
 
 		report, err := service.NewSkillLinter().Lint(root)
+		if err != nil {
+			t.Fatalf("expected no error, got %v", err)
+		}
+
+		assertNoFinding(t, report, lint.RuleLongFrontMatterDescription.ID)
+	})
+
+	t.Run("long description in strict mode", func(t *testing.T) {
+		t.Parallel()
+
+		root := t.TempDir()
+		longDescription := strings.Repeat("This description keeps adding context without sharpening the focus of the skill definition. ", 4)
+		testutil.WriteFiles(t, root, map[string]string{
+			"SKILL.md": strings.Join([]string{
+				"---",
+				"name: Example Skill",
+				"description: " + longDescription,
+				"---",
+				validSkillBody(),
+			}, "\n"),
+		})
+
+		report, err := service.NewSkillLinter().LintWithProfileAndStrictness(root, service.SkillLintProfileGeneric, lint.StrictnessStrict)
 		if err != nil {
 			t.Fatalf("expected no error, got %v", err)
 		}
@@ -386,12 +409,40 @@ func TestSkillLinterLineAwareStructureFindings(t *testing.T) {
 			}, "\n"),
 		})
 
-		report, err := service.NewSkillLinter().Lint(root)
+		report, err := service.NewSkillLinter().LintWithProfileAndStrictness(root, service.SkillLintProfileGeneric, lint.StrictnessPedantic)
 		if err != nil {
 			t.Fatalf("expected no error, got %v", err)
 		}
 
-		assertFinding(t, report, lint.RuleMissingTitle.ID, 5)
+		assertNoFinding(t, report, lint.RuleMissingTitle.ID)
+	})
+
+	t.Run("missing title without front matter name uses body start line", func(t *testing.T) {
+		t.Parallel()
+
+		root := t.TempDir()
+		testutil.WriteFiles(t, root, map[string]string{
+			"SKILL.md": strings.Join([]string{
+				"---",
+				"description: Validates reusable skill directories before sharing them with a team.",
+				"---",
+				"## Usage",
+				"",
+				"Run `firety skill lint .` before publishing changes.",
+				"",
+				"## Examples",
+				"",
+				"Request: Lint this skill before publishing it.",
+				"Invocation: Run `firety skill lint .` from the skill root.",
+			}, "\n"),
+		})
+
+		report, err := service.NewSkillLinter().LintWithProfileAndStrictness(root, service.SkillLintProfileGeneric, lint.StrictnessPedantic)
+		if err != nil {
+			t.Fatalf("expected no error, got %v", err)
+		}
+
+		assertFinding(t, report, lint.RuleMissingTitle.ID, 4)
 	})
 
 	t.Run("broken local links include line", func(t *testing.T) {
@@ -402,7 +453,7 @@ func TestSkillLinterLineAwareStructureFindings(t *testing.T) {
 			"SKILL.md": brokenLinkSkillContent(),
 		})
 
-		report, err := service.NewSkillLinter().Lint(root)
+		report, err := service.NewSkillLinter().LintWithProfileAndStrictness(root, service.SkillLintProfileGeneric, lint.StrictnessPedantic)
 		if err != nil {
 			t.Fatalf("expected no error, got %v", err)
 		}
@@ -449,6 +500,35 @@ func TestSkillLinterSkillQualityWarnings(t *testing.T) {
 		assertFinding(t, report, lint.RuleMissingUsageGuidance.ID, 0)
 	})
 
+	t.Run("narrative usage guidance counts in default mode", func(t *testing.T) {
+		t.Parallel()
+
+		root := t.TempDir()
+		testutil.WriteFiles(t, root, map[string]string{
+			"SKILL.md": skillWithFrontMatter(
+				"Example Skill",
+				"Use this skill when the user asks to validate a local skill directory before publishing changes.",
+				strings.Join([]string{
+					"# Example Skill",
+					"",
+					"The user provides a local skill directory and may include publication context or quality concerns.",
+					"",
+					"## Examples",
+					"",
+					"Request: Lint this skill before publishing it.",
+					"Result: Review the findings and fix any broken references before publishing.",
+				}, "\n"),
+			),
+		})
+
+		report, err := service.NewSkillLinter().Lint(root)
+		if err != nil {
+			t.Fatalf("expected no error, got %v", err)
+		}
+
+		assertNoFinding(t, report, lint.RuleMissingUsageGuidance.ID)
+	})
+
 	t.Run("missing when to use guidance", func(t *testing.T) {
 		t.Parallel()
 
@@ -484,6 +564,37 @@ func TestSkillLinterSkillQualityWarnings(t *testing.T) {
 		assertFinding(t, report, lint.RuleMissingWhenToUse.ID, 0)
 	})
 
+	t.Run("front matter trigger guidance counts in default mode", func(t *testing.T) {
+		t.Parallel()
+
+		root := t.TempDir()
+		testutil.WriteFiles(t, root, map[string]string{
+			"SKILL.md": skillWithFrontMatter(
+				"Example Skill",
+				"Use this skill when the user asks to validate a local skill directory before publishing changes.",
+				strings.Join([]string{
+					"# Example Skill",
+					"",
+					"## Usage",
+					"",
+					"Run `firety skill lint .` before publishing the skill.",
+					"",
+					"## Examples",
+					"",
+					"Request: Lint this skill before publishing it.",
+					"Invocation: Run `firety skill lint .` from the skill root.",
+				}, "\n"),
+			),
+		})
+
+		report, err := service.NewSkillLinter().Lint(root)
+		if err != nil {
+			t.Fatalf("expected no error, got %v", err)
+		}
+
+		assertNoFinding(t, report, lint.RuleMissingWhenToUse.ID)
+	})
+
 	t.Run("missing negative guidance", func(t *testing.T) {
 		t.Parallel()
 
@@ -512,6 +623,41 @@ func TestSkillLinterSkillQualityWarnings(t *testing.T) {
 		})
 
 		report, err := service.NewSkillLinter().Lint(root)
+		if err != nil {
+			t.Fatalf("expected no error, got %v", err)
+		}
+
+		assertNoFinding(t, report, lint.RuleMissingNegativeGuidance.ID)
+	})
+
+	t.Run("missing negative guidance in strict mode", func(t *testing.T) {
+		t.Parallel()
+
+		root := t.TempDir()
+		testutil.WriteFiles(t, root, map[string]string{
+			"SKILL.md": skillWithFrontMatter(
+				"Example Skill",
+				"Validates reusable skill directories before sharing them with a team.",
+				strings.Join([]string{
+					"# Example Skill",
+					"",
+					"## When To Use",
+					"",
+					"Use this skill when you need to validate a local skill directory before publishing changes.",
+					"",
+					"## Usage",
+					"",
+					"Run `firety skill lint .` from the skill root.",
+					"",
+					"## Examples",
+					"",
+					"Request: Lint this local skill directory before publishing it.",
+					"Invocation: Run `firety skill lint . --format json` from the skill root.",
+				}, "\n"),
+			),
+		})
+
+		report, err := service.NewSkillLinter().LintWithProfileAndStrictness(root, service.SkillLintProfileGeneric, lint.StrictnessStrict)
 		if err != nil {
 			t.Fatalf("expected no error, got %v", err)
 		}
@@ -550,7 +696,7 @@ func TestSkillLinterSkillQualityWarnings(t *testing.T) {
 			),
 		})
 
-		report, err := service.NewSkillLinter().Lint(root)
+		report, err := service.NewSkillLinter().LintWithProfileAndStrictness(root, service.SkillLintProfileGeneric, lint.StrictnessStrict)
 		if err != nil {
 			t.Fatalf("expected no error, got %v", err)
 		}
@@ -585,6 +731,40 @@ func TestSkillLinterSkillQualityWarnings(t *testing.T) {
 		})
 
 		report, err := service.NewSkillLinter().Lint(root)
+		if err != nil {
+			t.Fatalf("expected no error, got %v", err)
+		}
+
+		assertNoFinding(t, report, lint.RuleMissingExamples.ID)
+	})
+
+	t.Run("missing examples in strict mode", func(t *testing.T) {
+		t.Parallel()
+
+		root := t.TempDir()
+		testutil.WriteFiles(t, root, map[string]string{
+			"SKILL.md": skillWithFrontMatter(
+				"Example Skill",
+				"Validates reusable skill directories before sharing them with a team.",
+				strings.Join([]string{
+					"# Example Skill",
+					"",
+					"## When To Use",
+					"",
+					"Use this skill when you need to review a skill directory before publishing changes.",
+					"",
+					"## Usage",
+					"",
+					"Run `firety skill lint .` before publishing the skill.",
+					"",
+					"## Limitations",
+					"",
+					"Do not use this skill for remote repositories or tool-runtime validation.",
+				}, "\n"),
+			),
+		})
+
+		report, err := service.NewSkillLinter().LintWithProfileAndStrictness(root, service.SkillLintProfileGeneric, lint.StrictnessStrict)
 		if err != nil {
 			t.Fatalf("expected no error, got %v", err)
 		}
@@ -630,6 +810,38 @@ func TestSkillLinterSkillQualityWarnings(t *testing.T) {
 		assertFinding(t, report, lint.RuleWeakExamples.ID, 19)
 		assertFinding(t, report, lint.RuleGenericExamples.ID, 19)
 		assertFinding(t, report, lint.RuleExamplesMissingInvocationPattern.ID, 19)
+	})
+
+	t.Run("incidental for example phrase does not create examples section", func(t *testing.T) {
+		t.Parallel()
+
+		root := t.TempDir()
+		testutil.WriteFiles(t, root, map[string]string{
+			"SKILL.md": skillWithFrontMatter(
+				"Example Skill",
+				"Use this skill when the user asks to validate a local skill directory before publishing changes.",
+				strings.Join([]string{
+					"# Example Skill",
+					"",
+					"## Usage",
+					"",
+					"Run `firety skill lint .` from the skill root before publishing changes.",
+					"",
+					"## Notes",
+					"",
+					"Use a distinctive output format, for example a compact markdown checklist.",
+				}, "\n"),
+			),
+		})
+
+		report, err := service.NewSkillLinter().Lint(root)
+		if err != nil {
+			t.Fatalf("expected no error, got %v", err)
+		}
+
+		assertNoFinding(t, report, lint.RuleWeakExamples.ID)
+		assertNoFinding(t, report, lint.RuleGenericExamples.ID)
+		assertNoFinding(t, report, lint.RuleExamplesMissingInvocationPattern.ID)
 	})
 
 	t.Run("examples missing invocation pattern", func(t *testing.T) {
@@ -1072,8 +1284,6 @@ func TestSkillLinterDeterministicOrdering(t *testing.T) {
 		lint.RuleReferenceOutsideRoot.ID,
 		lint.RuleDuplicateHeading.ID,
 		lint.RuleMissingWhenToUse.ID,
-		lint.RuleMissingNegativeGuidance.ID,
-		lint.RuleMissingExamples.ID,
 		lint.RuleMissingUsageGuidance.ID,
 		lint.RuleSuspiciousRelativePath.ID,
 	}
@@ -1147,6 +1357,32 @@ func TestSkillLinterProfileAwarePortabilityWarnings(t *testing.T) {
 		assertFinding(t, report, lint.RuleToolSpecificBranding.ID, 13)
 		assertFinding(t, report, lint.RuleNonportableInvocationGuidance.ID, 13)
 		assertFinding(t, report, lint.RuleToolSpecificInstallAssumption.ID, 14)
+	})
+
+	t.Run("word forms do not trigger tool branding", func(t *testing.T) {
+		t.Parallel()
+
+		root := t.TempDir()
+		testutil.WriteFiles(t, root, map[string]string{
+			"SKILL.md": skillWithFrontMatter(
+				"Example Skill",
+				"Use this skill when the user asks for a polished frontend treatment.",
+				strings.Join([]string{
+					"# Example Skill",
+					"",
+					"## Usage",
+					"",
+					"Apply decorative borders, custom cursors, and layered gradients when they fit the design.",
+				}, "\n"),
+			),
+		})
+
+		report, err := service.NewSkillLinter().LintWithProfile(root, service.SkillLintProfileGeneric)
+		if err != nil {
+			t.Fatalf("expected no error, got %v", err)
+		}
+
+		assertNoFinding(t, report, lint.RuleToolSpecificBranding.ID)
 	})
 
 	t.Run("honest tool specific skill reduces generic-profile noise", func(t *testing.T) {
@@ -1518,7 +1754,43 @@ func TestSkillLinterBundleResourceWarnings(t *testing.T) {
 			t.Fatalf("expected no error, got %v", err)
 		}
 
+		assertNoFinding(t, report, lint.RuleMissingMentionedResource.ID)
+	})
+
+	t.Run("missing mentioned resource in strict mode", func(t *testing.T) {
+		t.Parallel()
+
+		root := t.TempDir()
+		testutil.WriteFiles(t, root, map[string]string{
+			"SKILL.md": bundleSkillContent([]string{
+				"Run `scripts/lint.sh` before publishing this skill.",
+			}),
+		})
+
+		report, err := service.NewSkillLinter().LintWithProfileAndStrictness(root, service.SkillLintProfileGeneric, lint.StrictnessStrict)
+		if err != nil {
+			t.Fatalf("expected no error, got %v", err)
+		}
+
 		assertFinding(t, report, lint.RuleMissingMentionedResource.ID, 13)
+	})
+
+	t.Run("project file globs and API methods are not treated as local resources", func(t *testing.T) {
+		t.Parallel()
+
+		root := t.TempDir()
+		testutil.WriteFiles(t, root, map[string]string{
+			"SKILL.md": bundleSkillContent([]string{
+				"Look for `*.py`, `package.json`, and `JSON.parse()` in the user's project before making changes.",
+			}),
+		})
+
+		report, err := service.NewSkillLinter().LintWithProfileAndStrictness(root, service.SkillLintProfileGeneric, lint.StrictnessStrict)
+		if err != nil {
+			t.Fatalf("expected no error, got %v", err)
+		}
+
+		assertNoFinding(t, report, lint.RuleMissingMentionedResource.ID)
 	})
 
 	t.Run("duplicate resource references", func(t *testing.T) {
@@ -1590,6 +1862,31 @@ func TestSkillLinterCostAwareWarnings(t *testing.T) {
 			t.Fatalf("expected no error, got %v", err)
 		}
 
+		assertNoFinding(t, report, lint.RuleLargeSkillMD.ID)
+	})
+
+	t.Run("large skill markdown in strict mode", func(t *testing.T) {
+		t.Parallel()
+
+		root := t.TempDir()
+		testutil.WriteFiles(t, root, map[string]string{
+			"SKILL.md": costSkillContent(
+				[]string{
+					strings.Repeat("Use this skill to validate local bundles before publishing changes with careful step-by-step review guidance. ", 90),
+				},
+				[]string{
+					"Request: Lint this local skill directory before publishing it.",
+					"Invocation: Run `firety skill lint . --format json` from the skill root.",
+					"Result: Review the reported findings and fix any issues before publishing.",
+				},
+			),
+		})
+
+		report, err := service.NewSkillLinter().LintWithProfileAndStrictness(root, service.SkillLintProfileGeneric, lint.StrictnessStrict)
+		if err != nil {
+			t.Fatalf("expected no error, got %v", err)
+		}
+
 		assertFinding(t, report, lint.RuleLargeSkillMD.ID, 0)
 	})
 
@@ -1613,7 +1910,7 @@ func TestSkillLinterCostAwareWarnings(t *testing.T) {
 			),
 		})
 
-		report, err := service.NewSkillLinter().Lint(root)
+		report, err := service.NewSkillLinter().LintWithProfileAndStrictness(root, service.SkillLintProfileGeneric, lint.StrictnessPedantic)
 		if err != nil {
 			t.Fatalf("expected no error, got %v", err)
 		}
@@ -1639,7 +1936,7 @@ func TestSkillLinterCostAwareWarnings(t *testing.T) {
 			),
 		})
 
-		report, err := service.NewSkillLinter().Lint(root)
+		report, err := service.NewSkillLinter().LintWithProfileAndStrictness(root, service.SkillLintProfileGeneric, lint.StrictnessPedantic)
 		if err != nil {
 			t.Fatalf("expected no error, got %v", err)
 		}
@@ -1671,6 +1968,34 @@ func TestSkillLinterCostAwareWarnings(t *testing.T) {
 			t.Fatalf("expected no error, got %v", err)
 		}
 
+		assertNoFinding(t, report, lint.RuleLargeReferencedResource.ID)
+		assertNoFinding(t, report, lint.RuleExcessiveBundleSize.ID)
+	})
+
+	t.Run("large referenced resource and bundle size in strict mode", func(t *testing.T) {
+		t.Parallel()
+
+		root := t.TempDir()
+		testutil.WriteFiles(t, root, map[string]string{
+			"SKILL.md": costSkillContent(
+				[]string{
+					"See [Reference](docs/reference.md) before publishing changes.",
+					"See [Playbook](docs/playbook.md) before publishing changes.",
+				},
+				[]string{
+					"Request: Lint this local skill directory before publishing it.",
+					"Invocation: Run `firety skill lint . --format json` from the skill root.",
+				},
+			),
+			"docs/reference.md": strings.Repeat("Reference guidance for validating a skill bundle before publishing it safely. ", 70),
+			"docs/playbook.md":  strings.Repeat("Playbook guidance for validating a skill bundle before publishing it safely. ", 130),
+		})
+
+		report, err := service.NewSkillLinter().LintWithProfileAndStrictness(root, service.SkillLintProfileGeneric, lint.StrictnessStrict)
+		if err != nil {
+			t.Fatalf("expected no error, got %v", err)
+		}
+
 		assertFinding(t, report, lint.RuleLargeReferencedResource.ID, 13)
 		assertFinding(t, report, lint.RuleExcessiveBundleSize.ID, 0)
 	})
@@ -1695,7 +2020,7 @@ func TestSkillLinterCostAwareWarnings(t *testing.T) {
 			),
 		})
 
-		report, err := service.NewSkillLinter().Lint(root)
+		report, err := service.NewSkillLinter().LintWithProfileAndStrictness(root, service.SkillLintProfileGeneric, lint.StrictnessPedantic)
 		if err != nil {
 			t.Fatalf("expected no error, got %v", err)
 		}
@@ -1837,6 +2162,16 @@ func assertFinding(t *testing.T, report lint.Report, ruleID string, line int) {
 	}
 
 	t.Fatalf("expected finding %q, got %#v", ruleID, report.Findings)
+}
+
+func assertNoFinding(t *testing.T, report lint.Report, ruleID string) {
+	t.Helper()
+
+	for _, finding := range report.Findings {
+		if finding.RuleID == ruleID {
+			t.Fatalf("expected no finding %q, got %#v", ruleID, finding)
+		}
+	}
 }
 
 func validSkillBody() string {
